@@ -21,6 +21,15 @@ fi
 
 rm -f "$SOCKET" "$APK_SOCKET"
 
+# If daemon not at expected path, try to find it elsewhere in module
+if [ ! -x "$DAEMON" ]; then
+    FOUND=$(find "$MODDIR" -name "ksu-toastd" -type f 2>/dev/null | head -1)
+    if [ -n "$FOUND" ] && [ "$FOUND" != "$DAEMON" ]; then
+        cp "$FOUND" "$DAEMON" 2>/dev/null
+        chmod 0755 "$DAEMON" 2>/dev/null
+    fi
+fi
+
 if [ -x "$DAEMON" ]; then
     mkdir -p "$PERSISTENT_DIR"
     ASH_STANDALONE=1 "$DAEMON" \
