@@ -1,0 +1,21 @@
+# KSU Toast - SELinux rules
+# Allow ksu-toastd (runs as root) to communicate with the companion APK
+
+# Allow daemon to use unix domain sockets
+allow ksu_daemon ksu_toast_apk:socket create_socket_perms;
+allow ksu_toast_apk ksu_daemon:socket create_socket_perms;
+
+# Allow daemon to read /proc for UID detection
+allow ksu_daemon self:capability sys_ptrace;
+allow ksu_daemon proc:file read;
+
+# Allow daemon to create files in /data/adb/ksu-toast/
+allow ksu_daemon ksu_data_file:dir create_dir_perms;
+allow ksu_daemon ksu_data_file:file create_file_perms;
+
+# Allow companion APK to create sockets
+allow ksu_toast_apk self:unix_dgram_socket create_socket_perms;
+allow ksu_toast_apk self:unix_stream_socket create_socket_perms;
+
+# Allow ksu-toastd to setuid to manager app uid
+allow ksu_daemon self:capability setuid;

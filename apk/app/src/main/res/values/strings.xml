@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">KSU Toast</string>
+    <string name="channel_name">Root Requests</string>
+    <string name="channel_desc">Notifications for apps requesting root access</string>
+    <string name="service_notification">KSU Toast is running</string>
+    <string name="grant">Grant</string>
+    <string name="deny">Deny</string>
+    <string name="ignore">Ignore</string>
+    <string name="root_request_title">Root request</string>
+    <string name="root_request_text">%s wants root access</string>
+</resources>

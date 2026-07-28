@@ -1,0 +1,16 @@
+build/
+dist/
+*.zip
+*.o
+su
+ksu-toastd
+apk/app/build/
+apk/build/
+apk/.gradle/
+apk/local.properties
+apk/gradlew
+apk/gradlew.bat
+apk/gradle/wrapper/gradle-wrapper.jar
+.DS_Store
+KernelSU-Next/
+Magisk/

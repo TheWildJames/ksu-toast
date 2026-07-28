@@ -1,0 +1,6 @@
+id=ksu_toast
+name=KSU Toast
+version=v1
+versionCode=1
+author=WildKernels
+description=Notification-based root authorization for KernelSU Next. Shows Grant/Deny/Ignore notifications when apps request root.

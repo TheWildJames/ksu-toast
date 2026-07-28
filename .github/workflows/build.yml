@@ -1,0 +1,143 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  MODULE_ID: ksu_toast
+  RELEASE_TITLE: KSU Toast
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get next release version
+        id: version
+        run: |
+          # Find the latest release tag (numeric), increment by 1
+          LATEST=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || echo "0")
+          # Strip any non-numeric prefix
+          LATEST_NUM=$(echo "$LATEST" | grep -oP '^\d+' || echo "0")
+          NEXT=$((LATEST_NUM + 1))
+          echo "tag=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "num=$NEXT" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r27
+          add-to-path: false
+
+      - name: Build su-wrapper (ARM64)
+        run: |
+          TOOLCHAIN="${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64"
+          CC="$TOOLCHAIN/bin/aarch64-linux-android33-clang"
+          $CC -static -Os -s -Wall -Wextra -o su wrapper/su-wrapper.c
+          mkdir -p build/system/bin
+          cp su build/system/bin/
+          file build/system/bin/su
+        shell: bash
+
+      - name: Build ksu-toastd (ARM64)
+        run: |
+          TOOLCHAIN="${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64"
+          CC="$TOOLCHAIN/bin/aarch64-linux-android33-clang"
+          $CC -static -Os -s -Wall -Wextra -pthread -o ksu-toastd daemon/ksu-toastd.c
+          mkdir -p build/daemon
+          cp ksu-toastd build/daemon/
+          file build/daemon/ksu-toastd
+        shell: bash
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build companion APK
+        run: |
+          cd apk
+          chmod +x gradlew 2>/dev/null || true
+          # Generate gradle wrapper if not present
+          if [ ! -f gradlew ]; then
+            gradle wrapper --gradle-version 8.5
+          fi
+          ./gradlew assembleRelease --no-daemon
+          cd ..
+          mkdir -p build/apk
+          cp apk/app/build/outputs/apk/release/app-release.apk build/apk/KsuToast.apk 2>/dev/null || \
+            cp apk/app/build/outputs/apk/release/app-release-unsigned.apk build/apk/KsuToast.apk 2>/dev/null || \
+            echo "WARNING: APK build failed or output not found"
+        shell: bash
+        continue-on-error: true
+
+      - name: Package KSU module
+        run: |
+          mkdir -p dist
+          MODULE_DIR="build"
+          VERSION="${{ steps.version.outputs.num }}"
+
+          # Create module.prop with correct version
+          cat > "$MODULE_DIR/module.prop" << EOF
+          id=$MODULE_ID
+          name=KSU Toast
+          version=v${VERSION}
+          versionCode=${VERSION}
+          author=WildKernels
+          description=Notification-based root authorization for KernelSU Next. Shows Grant/Deny/Ignore notifications when apps request root.
+          EOF
+
+          # Copy module scripts
+          cp module.prop "$MODULE_DIR/" 2>/dev/null || true
+          cp customize.sh "$MODULE_DIR/" 2>/dev/null || true
+          cp post-fs-data.sh "$MODULE_DIR/" 2>/dev/null || true
+          cp service.sh "$MODULE_DIR/" 2>/dev/null || true
+          cp sepolicy.rule "$MODULE_DIR/" 2>/dev/null || true
+
+          # Create the zip
+          cd "$MODULE_DIR"
+          zip -r9 "../dist/${MODULE_ID}-v${VERSION}.zip" .
+          cd ..
+
+          echo "zip_path=dist/${MODULE_ID}-v${VERSION}.zip" >> "$GITHUB_OUTPUT"
+          echo "zip_name=${MODULE_ID}-v${VERSION}.zip" >> "$GITHUB_OUTPUT"
+        id: package
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "${{ env.RELEASE_TITLE }} v${{ steps.version.outputs.num }}"
+          body: |
+            **KSU Toast v${{ steps.version.outputs.num }}**
+
+            Automated build from commit ${{ github.sha }}.
+
+            ## What's new
+            - See commit history for details
+
+            ## Installation
+            1. Download the `.zip` from Assets
+            2. Open KSU Next Manager → Modules → Install from storage
+            3. Select the zip
+            4. Reboot
+
+            **Requires:** KernelSU Next with working root
+          files: ${{ steps.package.outputs.zip_path }}
+          generate_release_notes: true
