@@ -152,14 +152,6 @@ class MainService : Service() {
         // Store the writer so the broadcast receiver can access it
         PendingRequest.store(reqId, uid, writer)
 
-        val intent = Intent(this, NotificationActionReceiver::class.java).apply {
-            putExtra("req_id", reqId)
-            putExtra("uid", uid)
-            putExtra("app_name", appName)
-            // Use unique action for each notification to avoid intent collisions
-            action = "com.wildkernels.ksutoast.ACTION_RESPOND_$reqId"
-        }
-
         val grantIntent = PendingIntent.getBroadcast(
             this, uid * 3 + 0,
             Intent(this, NotificationActionReceiver::class.java).apply {

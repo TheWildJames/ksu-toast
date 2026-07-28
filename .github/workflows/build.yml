@@ -77,7 +77,9 @@ jobs:
           ./gradlew assembleRelease --no-daemon
           cd ..
           mkdir -p build/apk
-          cp apk/app/build/outputs/apk/release/app-release.apk build/apk/KsuToast.apk
+          # Use release APK (unsigned is fine for KSU module install)
+          cp apk/app/build/outputs/apk/release/app-release.apk build/apk/KsuToast.apk 2>/dev/null || \
+            cp apk/app/build/outputs/apk/release/app-release-unsigned.apk build/apk/KsuToast.apk
         shell: bash
         continue-on-error: false
 
