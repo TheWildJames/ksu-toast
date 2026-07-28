@@ -129,17 +129,17 @@ class MainService : Service() {
 
         val grantIntent = PendingIntent.getBroadcast(
             this, uid * 3 + 0,
-            intent.clone().apply { putExtra("action", "GRANT") },
+            (intent.clone() as Intent).apply { putExtra("action", "GRANT") },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val denyIntent = PendingIntent.getBroadcast(
             this, uid * 3 + 1,
-            intent.clone().apply { putExtra("action", "DENY") },
+            (intent.clone() as Intent).apply { putExtra("action", "DENY") },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val ignoreIntent = PendingIntent.getBroadcast(
             this, uid * 3 + 2,
-            intent.clone().apply { putExtra("action", "IGNORE") },
+            (intent.clone() as Intent).apply { putExtra("action", "IGNORE") },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
