@@ -102,13 +102,17 @@ jobs:
           sed -i "s/^version=.*/version=v${VERSION}/" "$MODULE_DIR/module.prop"
           sed -i "s/^versionCode=.*/versionCode=${VERSION}/" "$MODULE_DIR/module.prop"
 
-          # Create the zip
+          # Create the zips — versioned name + static name for auto-update
           cd "$MODULE_DIR"
           zip -r9 "../dist/${MODULE_ID}-v${VERSION}.zip" .
           cd ..
+          # Static name for auto-update (always the same filename)
+          cp "dist/${MODULE_ID}-v${VERSION}.zip" "dist/${MODULE_ID}.zip"
 
           echo "zip_path=dist/${MODULE_ID}-v${VERSION}.zip" >> "$GITHUB_OUTPUT"
           echo "zip_name=${MODULE_ID}-v${VERSION}.zip" >> "$GITHUB_OUTPUT"
+          echo "static_zip_path=dist/${MODULE_ID}.zip" >> "$GITHUB_OUTPUT"
+          echo "static_zip_name=${MODULE_ID}.zip" >> "$GITHUB_OUTPUT"
         id: package
 
       - name: Create Release
@@ -131,5 +135,20 @@ jobs:
             4. Reboot
 
             **Requires:** KernelSU Next with working root
-          files: ${{ steps.package.outputs.zip_path }}
+          files: |
+            ${{ steps.package.outputs.zip_path }}
+            ${{ steps.package.outputs.static_zip_path }}
           generate_release_notes: true
+
+      - name: Update update.json in repo
+        run: |
+          VERSION="${{ steps.version.outputs.num }}"
+          # Patch update.json with the new version
+          sed -i "s/\"version\": \".*\"/\"version\": \"v${VERSION}\"/" update.json
+          sed -i "s/\"versionCode\": [0-9]*/\"versionCode\": ${VERSION}/" update.json
+          # Commit and push back to the repo (skip CI to avoid loop)
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add update.json
+          git commit -m "chore: bump update.json to v${VERSION} [skip ci]" || true
+          git push
