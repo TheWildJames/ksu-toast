@@ -48,6 +48,9 @@ if [ -f "$APK_SRC" ]; then
     else
         ui_print "- pm install: $(echo "$INSTALL_OUT" | tail -1)"
     fi
+
+    # Grant notification permission — root has privilege
+    pm grant com.wildkernels.ksutoast android.permission.POST_NOTIFICATIONS 2>/dev/null || true
 else
     ui_print "- WARNING: KsuToast.apk not found at $APK_SRC"
 fi

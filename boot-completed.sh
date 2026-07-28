@@ -17,7 +17,7 @@ LOG="$PERSISTENT_DIR/daemon.log"
 
 mkdir -p "$PERSISTENT_DIR"
 
-# 1. Install companion APK if needed
+# 1. Install companion APK if needed, and auto-grant notification perms
 if ! pm path com.wildkernels.ksutoast >/dev/null 2>&1; then
     if [ -f "$MODDIR/apk/KsuToast.apk" ]; then
         cp "$MODDIR/apk/KsuToast.apk" /data/local/tmp/KsuToast.apk
@@ -25,6 +25,9 @@ if ! pm path com.wildkernels.ksutoast >/dev/null 2>&1; then
         rm -f /data/local/tmp/KsuToast.apk
     fi
 fi
+
+# Grant notification permission — runs as root, no user prompt needed
+pm grant com.wildkernels.ksutoast android.permission.POST_NOTIFICATIONS 2>/dev/null || true
 
 # 2. Start daemon if not already running
 if [ -f "$DAEMON_PID" ]; then
