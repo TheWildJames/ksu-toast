@@ -1,73 +1,74 @@
 #!/system/bin/sh
 # KSU Toast - Action button script
 # Runs when you tap the "Action" button in KSU Next Manager.
-# Just a status check — doesn't modify anything.
+# Shows status + optionally triggers a test root request.
 
 MODDIR=${0%/*}
+PERSISTENT_DIR=/data/adb/ksu-toast
 
 echo "╔══════════════════════════════════╗"
-echo "║        KSU Toast v1             ║"
+echo "║        KSU Toast                 ║"
 echo "╚══════════════════════════════════╝"
 echo ""
 
-# Check daemon status
-DAEMON_PID=/data/adb/ksu-toast/daemon.pid
+# ── Status checks ────────────────────────────────────────
+DAEMON_PID="$PERSISTENT_DIR/daemon.pid"
 if [ -f "$DAEMON_PID" ]; then
     PID=$(cat "$DAEMON_PID" 2>/dev/null)
     if kill -0 "$PID" 2>/dev/null; then
         echo "✓ Daemon running (pid: $PID)"
     else
-        echo "✗ Daemon pid file stale — not running"
+        echo "✗ Daemon pid file stale"
     fi
 else
     echo "✗ Daemon not started"
 fi
 
-# Check socket
-if [ -S /data/adb/ksu-toast/daemon.sock ]; then
-    echo "✓ Socket exists"
+if [ -S "$PERSISTENT_DIR/daemon.sock" ]; then
+    echo "✓ Daemon socket ready"
 else
-    echo "✗ Socket missing"
+    echo "✗ Daemon socket missing"
 fi
 
-# Check deny list count
-DENY=/data/adb/ksu-toast/deny.list
-if [ -f "$DENY" ]; then
-    COUNT=$(wc -l < "$DENY")
-    echo "✓ Deny list: $COUNT entries"
+DENY="$PERSISTENT_DIR/deny.list"
+[ -f "$DENY" ] && echo "✓ Deny list: $(wc -l < "$DENY") entries" || echo "✗ Deny list missing"
+
+CACHE="$PERSISTENT_DIR/allow.cache"
+[ -f "$CACHE" ] && echo "✓ Allow cache: $(wc -l < "$CACHE") entries" || echo "✗ Allow cache missing"
+
+if [ -f /system/bin/su ] && file /system/bin/su 2>/dev/null | grep -q ELF; then
+    echo "✓ su wrapper active (binary)"
 else
-    echo "✗ Deny list missing"
+    echo "? su is symlink — wrapper may not be active"
 fi
 
-# Check cache count
-CACHE=/data/adb/ksu-toast/allow.cache
-if [ -f "$CACHE" ]; then
-    COUNT=$(wc -l < "$CACHE")
-    echo "✓ Allow cache: $COUNT entries"
-else
-    echo "✗ Allow cache missing"
-fi
-
-# Check su wrapper
-if [ -f /system/bin/su ]; then
-    SU_TYPE=$(file /system/bin/su 2>/dev/null | grep -c "ELF" || echo 0)
-    if [ "$SU_TYPE" -ge 1 ]; then
-        echo "✓ su wrapper installed (binary)"
-    else
-        echo "? su is symlink — wrapper may not be active"
-    fi
-else
-    echo "✗ su binary missing"
-fi
-
-# Check companion APK
-APK_INFO=$(pm list packages com.wildkernels.ksutoast 2>/dev/null)
-if echo "$APK_INFO" | grep -q "ksutoast"; then
+if pm path com.wildkernels.ksutoast >/dev/null 2>&1; then
     echo "✓ Companion APK installed"
 else
-    echo "? Companion APK not installed"
+    echo "✗ Companion APK not installed"
 fi
 
 echo ""
-echo "To see this again: tap Action in KSU Manager"
+echo "═══ Test: trigger root request ═══"
+echo ""
+
+# Attempt a test su call. This hits the su-wrapper → daemon flow.
+# If daemon is running, it should ask the user via notification.
+echo "Running: su -c id"
+echo "(this will trigger a notification if daemon is running)"
+echo ""
+TEST_OUTPUT=$(su -c id 2>&1 </dev/null) && {
+    echo "✓ ROOT ACCESS GRANTED"
+    echo "  uid=$(echo "$TEST_OUTPUT" | grep -o 'uid=[^ ]*' || echo "unknown")"
+} || {
+    echo "✗ Root request denied or timed out"
+    echo "  (expected if daemon not running or no user response)"
+}
+
+echo ""
+echo "═══ Help ═══"
+echo ""
+echo "- Ensure daemon is running: check status above"
+echo "- Grant notification permission to KSU Toast app"
+echo "- Check /data/adb/ksu-toast/ for logs"
 echo ""
