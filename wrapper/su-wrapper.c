@@ -138,6 +138,7 @@ static int read_response(int fd, char *buf, size_t buf_size) {
 }
 
 int main(int argc, char *argv[]) {
+    (void)argc; /* unused — we get caller info from /proc */
     /* Get caller info */
     int uid = get_caller_uid();
     if (uid < 0) {

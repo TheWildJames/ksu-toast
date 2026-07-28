@@ -93,22 +93,16 @@ jobs:
           MODULE_DIR="build"
           VERSION="${{ steps.version.outputs.num }}"
 
-          # Create module.prop with correct version
-          cat > "$MODULE_DIR/module.prop" << EOF
-          id=$MODULE_ID
-          name=KSU Toast
-          version=v${VERSION}
-          versionCode=${VERSION}
-          author=WildKernels
-          description=Notification-based root authorization for KernelSU Next. Shows Grant/Deny/Ignore notifications when apps request root.
-          EOF
-
           # Copy module scripts
           cp module.prop "$MODULE_DIR/" 2>/dev/null || true
           cp customize.sh "$MODULE_DIR/" 2>/dev/null || true
           cp post-fs-data.sh "$MODULE_DIR/" 2>/dev/null || true
           cp service.sh "$MODULE_DIR/" 2>/dev/null || true
           cp sepolicy.rule "$MODULE_DIR/" 2>/dev/null || true
+
+          # Patch version into module.prop
+          sed -i "s/^version=.*/version=v${VERSION}/" "$MODULE_DIR/module.prop"
+          sed -i "s/^versionCode=.*/versionCode=${VERSION}/" "$MODULE_DIR/module.prop"
 
           # Create the zip
           cd "$MODULE_DIR"

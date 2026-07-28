@@ -35,7 +35,10 @@
 #define PACKAGES_LIST   "/data/system/packages.list"
 
 #define SOCKET_BACKLOG  16
-#define LINE_MAX        4096
+/* Use a guard since NDK already defines LINE_MAX */
+#ifndef LINE_MAX
+#define LINE_MAX 4096
+#endif
 #define REQ_TIMEOUT_SEC 10
 #define PKG_NAME_MAX    256
 
@@ -86,6 +89,10 @@ static int daemon_sock_fd = -1;
 static int apk_listen_fd = -1;
 static volatile int running = 1;
 static int manager_uid = -1;
+
+/* Configurable paths (parsed from argv, defaults from defines) */
+static const char *g_deny_path = DENY_LIST;
+static const char *g_cache_path = ALLOW_CACHE;
 
 /* ── Helpers ────────────────────────────────────────────── */
 
@@ -288,13 +295,13 @@ static int ask_apk(int uid, const char *app_name) {
 /* ── Handle an su-wrapper CHECK request ────────────────── */
 static void handle_check(int client_fd, int uid, const char *app_name) {
     /* 1. Already in allow.cache → ALLOWED immediately */
-    if (file_contains(ALLOW_CACHE, uid)) {
+    if (file_contains(g_cache_path, uid)) {
         write(client_fd, "ALLOWED\n", 8);
         return;
     }
 
     /* 2. In deny.list → DENIED immediately */
-    if (file_contains(DENY_LIST, uid)) {
+    if (file_contains(g_deny_path, uid)) {
         write(client_fd, "DENIED\n", 7);
         return;
     }
@@ -308,7 +315,7 @@ static void handle_check(int client_fd, int uid, const char *app_name) {
         /* User chose GRANT — add to allowlist via ioctl */
         if (grant_app_root(uid, app_name) == 0) {
             /* Cache it so we don't ask again in this session */
-            file_append(ALLOW_CACHE, uid);
+            file_append(g_cache_path, uid);
             write(client_fd, "ALLOWED\n", 8);
             fprintf(stderr, "[ksu-toast] Granted root for uid=%d (%s)\n", uid, app_name);
         } else {
@@ -317,7 +324,7 @@ static void handle_check(int client_fd, int uid, const char *app_name) {
         }
     } else if (apk_result == 0) {
         /* User chose DENY — add to deny list */
-        file_append(DENY_LIST, uid);
+        file_append(g_deny_path, uid);
         write(client_fd, "DENIED\n", 7);
         fprintf(stderr, "[ksu-toast] Denied root for uid=%d (%s)\n", uid, app_name);
     } else {
@@ -369,8 +376,7 @@ int main(int argc, char *argv[]) {
     /* Default paths (can be overridden by env or args) */
     const char *sock_path = DAEMON_SOCKET;
     const char *apk_path = APK_SOCKET;
-    const char *deny_path = DENY_LIST;
-    const char *cache_path = ALLOW_CACHE;
+    /* g_deny_path and g_cache_path initialized at file scope */
 
     /* Parse args (for testing / manual launch) */
     for (int i = 1; i < argc; i++) {
@@ -379,9 +385,9 @@ int main(int argc, char *argv[]) {
         else if (strcmp(argv[i], "--apk-socket") == 0 && i + 1 < argc)
             apk_path = argv[++i];
         else if (strcmp(argv[i], "--deny-list") == 0 && i + 1 < argc)
-            deny_path = argv[++i];
+            g_deny_path = argv[++i];
         else if (strcmp(argv[i], "--cache") == 0 && i + 1 < argc)
-            cache_path = argv[++i];
+            g_cache_path = argv[++i];
     }
 
     /* Resolve manager UID */
