@@ -1,43 +1,39 @@
 #!/system/bin/sh
 
 # KSU Toast - service.sh
-# Starts the ksu-toastd daemon in late_start service mode
+# late_start service mode script.
+# Falls back to starting daemon if boot-completed.sh didn't run.
 
-MODDIR=${0%/*}
-DAEMON=/data/adb/ksu-toast/ksu-toastd
-CONFIG=/data/adb/ksu-toast/config
-DENY_LIST=/data/adb/ksu-toast/deny.list
-CACHE=/data/adb/ksu-toast/allow.cache
-SOCKET=/data/adb/ksu-toast/daemon.sock
-APK_SOCKET=/data/adb/ksu-toast/apk.sock
+MODDIR="${0%/*}"
+PERSISTENT_DIR=/data/adb/ksu-toast
+SOCKET="$PERSISTENT_DIR/daemon.sock"
+APK_SOCKET="$PERSISTENT_DIR/apk.sock"
+DENY_LIST="$PERSISTENT_DIR/deny.list"
+CACHE="$PERSISTENT_DIR/allow.cache"
+# Daemon binary lives in module dir
+DAEMON="$MODDIR/daemon/ksu-toastd"
+DAEMON_PID="$PERSISTENT_DIR/daemon.pid"
 
-# Ensure config dir exists
-mkdir -p "$CONFIG"
-touch "$DENY_LIST" "$CACHE"
-
-# Kill any existing daemon
-if [ -f "$SOCKET" ]; then
-    kill "$(cat /data/adb/ksu-toast/daemon.pid 2>/dev/null)" 2>/dev/null || true
-    rm -f "$SOCKET" "$APK_SOCKET"
+# Only start if daemon isn't already running
+if [ -f "$DAEMON_PID" ]; then
+    PID=$(cat "$DAEMON_PID" 2>/dev/null)
+    [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null && exit 0
 fi
 
-# Start daemon
+rm -f "$SOCKET" "$APK_SOCKET"
+
 if [ -x "$DAEMON" ]; then
-    # Run in standalone shell mode via KSU BusyBox
     ASH_STANDALONE=1 "$DAEMON" \
         --socket "$SOCKET" \
         --apk-socket "$APK_SOCKET" \
         --deny-list "$DENY_LIST" \
         --cache "$CACHE" \
-        --config "$CONFIG" &
-    
-    echo $! > /data/adb/ksu-toast/daemon.pid
-    
-    # Give it time to bind the socket
+        --config "$PERSISTENT_DIR/config" &
+    echo $! > "$DAEMON_PID"
     sleep 1
-    
+
     if [ -S "$SOCKET" ]; then
-        echo "[ksu-toast] Daemon started (pid: $(cat /data/adb/ksu-toast/daemon.pid))"
+        echo "[ksu-toast] Daemon started (pid: $(cat $DAEMON_PID))"
     else
         echo "[ksu-toast] Daemon failed to start"
     fi

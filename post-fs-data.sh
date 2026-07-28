@@ -1,14 +1,8 @@
 #!/system/bin/sh
 
 # KSU Toast - post-fs-data.sh
-# Early boot script. Runs before system is fully booted.
-# Just ensures data directory exists — APK install and daemon
-# start happen in boot-completed.sh where pm is available.
+# Early boot — just set up props. Daemon and APK handled
+# in boot-completed.sh where system is fully ready.
 
-MODDIR=${0%/*}
-PERSISTENT_DIR=/data/adb/ksu-toast
-
-mkdir -p "$PERSISTENT_DIR/config"
-
-# Set default timeout (seconds) for root request UI
+mkdir -p /data/adb/ksu-toast/config
 setprop ksu.toast.timeout 10
