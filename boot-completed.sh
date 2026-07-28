@@ -80,3 +80,10 @@ if [ -x "$DAEMON" ]; then
 else
     echo "[ksu-toast] Daemon binary not found at $DAEMON"
 fi
+
+# 3. Start companion APK foreground service (no root needed)
+if pm path com.wildkernels.ksutoast >/dev/null 2>&1; then
+    am start-foreground-service -n com.wildkernels.ksutoast/.MainService >/dev/null 2>&1 && \
+        echo "[ksu-toast] Companion APK service started" || \
+        echo "[ksu-toast] Failed to start APK service"
+fi

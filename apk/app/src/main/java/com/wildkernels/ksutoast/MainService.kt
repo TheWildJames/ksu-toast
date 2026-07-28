@@ -10,20 +10,18 @@ import android.os.IBinder
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.PrintWriter
-import java.net.ServerSocket
+import android.net.LocalSocket
+import android.net.LocalSocketAddress
 
 /** Base notification ID — offset by UID for uniqueness */
 const val NOTIF_ID_BASE = 1000
 
 /**
- * Foreground service that listens on a Unix socket for root requests
- * from ksu-toastd and posts interactive notifications.
+ * Foreground service that connects to the ksu-toastd daemon's APK socket,
+ * receives root requests, and posts interactive notifications.
  *
- * The daemon connects and sends:
- *   REQUEST <req_id> <uid> <app_name>\n
- *
- * The user taps a notification action button, which triggers
- * NotificationActionReceiver to send the response back.
+ * No root required — connects as a regular Android app to a world-readable
+ * Unix socket created by the daemon.
  */
 class MainService : Service() {
 
@@ -31,7 +29,6 @@ class MainService : Service() {
     private val NOTIF_ID_SERVICE = 1
 
     private var running = true
-    private var serverSocket: ServerSocket? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -42,8 +39,7 @@ class MainService : Service() {
         val notification = buildServiceNotification()
         startForeground(NOTIF_ID_SERVICE, notification)
 
-        // Start listening in a background thread
-        Thread({ listenForRequests() }, "ksu-toast-listener").start()
+        Thread({ connectToDaemon() }, "ksu-toast-client").start()
 
         return START_STICKY
     }
@@ -52,7 +48,6 @@ class MainService : Service() {
 
     override fun onDestroy() {
         running = false
-        serverSocket?.close()
         super.onDestroy()
     }
 
@@ -77,112 +72,74 @@ class MainService : Service() {
     }
 
     /**
-     * Listens on the APK socket for incoming root requests from ksu-toastd.
+     * Connects to the daemon's APK socket as a client and listens
+     * for incoming root request messages.
+     *
+     * The daemon sends: REQUEST <req_id> <uid> <app_name>\n
+     * We post a notification, and when the user taps a button,
+     * NotificationActionReceiver sends the response back.
      */
-    private fun listenForRequests() {
+    private fun connectToDaemon() {
         val socketPath = "/data/adb/ksu-toast/apk.sock"
 
-        try {
-            // Bind to the Unix socket
-            val local = android.net.LocalServerSocket(socketPath)
-            serverSocket = null // We use LocalServerSocket, not ServerSocket
-            running = true
+        // Retry loop — daemon might not be ready yet at boot
+        while (running) {
+            try {
+                val socket = LocalSocket()
+                socket.connect(LocalSocketAddress(socketPath, LocalSocketAddress.Namespace.FILESYSTEM))
 
-            while (running) {
-                try {
-                    val client = local.accept()
-                    handleClient(client)
-                } catch (e: Exception) {
-                    if (running) {
-                        // Ignore transient accept errors
-                    }
+                val reader = BufferedReader(InputStreamReader(socket.inputStream))
+                val writer = PrintWriter(socket.outputStream, true)
+
+                while (running) {
+                    val line = reader.readLine() ?: break
+                    handleRequest(line, writer)
                 }
-            }
 
-            local.close()
-        } catch (e: Exception) {
-            // Socket already exists or other error
-            // Try connecting as a client instead (retry loop)
-            retryConnectToDaemon()
+                socket.close()
+            } catch (e: Exception) {
+                if (!running) break
+                // Daemon socket not ready yet — retry in 3 seconds
+                try { Thread.sleep(3000) } catch (_: InterruptedException) { break }
+            }
         }
     }
 
     /**
-     * If we couldn't create the server socket (daemon beat us to it,
-     * or permissions), connect as a client to an already-running APK
-     * (only one instance needed).
+     * Parse a REQUEST line from the daemon and post a notification.
+     *
+     * Format: REQUEST <req_id> <uid> <app_name>
      */
-    private fun retryConnectToDaemon() {
-        // Even as a client, we still need the daemon to tell us about requests.
-        // For now, this means another instance of the APK already has the socket.
-        // We just become a standby instance - our service notification stays up.
-    }
+    private fun handleRequest(line: String, writer: PrintWriter) {
+        val parts = line.split(" ")
+        if (parts.size < 3 || parts[0] != "REQUEST") return
 
-    /**
-     * Handle an incoming connection from ksu-toastd.
-     * Format: REQUEST <req_id> <uid> <app_name>\n
-     */
-    private fun handleClient(client: android.net.LocalSocket) {
-        try {
-            val reader = BufferedReader(InputStreamReader(client.inputStream))
-            val writer = PrintWriter(client.outputStream, true)
+        val reqId = parts[1]
+        val uid = parts[2].toIntOrNull() ?: return
+        val appName = if (parts.size > 3) parts.drop(3).joinToString(" ") else "unknown"
 
-            val line = reader.readLine() ?: return
-            val parts = line.split(" ")
-
-            if (parts.size >= 3 && parts[0] == "REQUEST") {
-                val reqId = parts[1]
-                val uid = parts[2].toIntOrNull() ?: return
-                val appName = if (parts.size > 3) parts.drop(3).joinToString(" ") else "unknown"
-
-                showNotification(reqId, uid, appName, writer)
-            }
-        } catch (_: Exception) {
-        } finally {
-            try { client.close() } catch (_: Exception) {}
-        }
-    }
-
-    /**
-     * Post a notification with Grant/Deny/Ignore actions.
-     * The PendingIntent carries the request details so
-     * NotificationActionReceiver can respond.
-     */
-    private fun showNotification(reqId: String, uid: Int, appName: String, writer: PrintWriter) {
-        // Store the writer so the broadcast receiver can access it
+        // Store writer mapped by reqId so the broadcast receiver can respond
         PendingRequest.store(reqId, uid, writer)
+
+        val intent = Intent(this, NotificationActionReceiver::class.java).apply {
+            putExtra("req_id", reqId)
+            putExtra("uid", uid)
+            putExtra("app_name", appName)
+        }
 
         val grantIntent = PendingIntent.getBroadcast(
             this, uid * 3 + 0,
-            Intent(this, NotificationActionReceiver::class.java).apply {
-                putExtra("req_id", reqId)
-                putExtra("uid", uid)
-                putExtra("app_name", appName)
-                putExtra("action", "GRANT")
-                action = "com.wildkernels.ksutoast.ACTION_RESPOND_$reqId"
-            },
+            intent.clone().apply { putExtra("action", "GRANT") },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val denyIntent = PendingIntent.getBroadcast(
             this, uid * 3 + 1,
-            Intent(this, NotificationActionReceiver::class.java).apply {
-                putExtra("req_id", reqId)
-                putExtra("uid", uid)
-                putExtra("app_name", appName)
-                putExtra("action", "DENY")
-                action = "com.wildkernels.ksutoast.ACTION_RESPOND_$reqId"
-            },
+            intent.clone().apply { putExtra("action", "DENY") },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val ignoreIntent = PendingIntent.getBroadcast(
             this, uid * 3 + 2,
-            Intent(this, NotificationActionReceiver::class.java).apply {
-                putExtra("req_id", reqId)
-                putExtra("uid", uid)
-                putExtra("app_name", appName)
-                putExtra("action", "IGNORE")
-                action = "com.wildkernels.ksutoast.ACTION_RESPOND_$reqId"
-            },
+            intent.clone().apply { putExtra("action", "IGNORE") },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -192,7 +149,6 @@ class MainService : Service() {
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setAutoCancel(true)
             .setCategory(Notification.CATEGORY_EVENT)
-            .setPriority(Notification.PRIORITY_HIGH)
             .addAction(0, getString(R.string.grant), grantIntent)
             .addAction(0, getString(R.string.deny), denyIntent)
             .addAction(0, getString(R.string.ignore), ignoreIntent)
