@@ -73,11 +73,7 @@ jobs:
       - name: Build companion APK
         run: |
           cd apk
-          chmod +x gradlew 2>/dev/null || true
-          # Generate gradle wrapper if not present
-          if [ ! -f gradlew ]; then
-            gradle wrapper --gradle-version 8.5
-          fi
+          chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
           cd ..
           mkdir -p build/apk
