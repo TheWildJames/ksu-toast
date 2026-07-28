@@ -110,6 +110,7 @@ class MainService : Service() {
      *
      * Format: REQUEST <req_id> <uid> <app_name>
      */
+    @Suppress("DEPRECATION")
     private fun handleRequest(line: String, writer: PrintWriter) {
         val parts = line.split(" ")
         if (parts.size < 3 || parts[0] != "REQUEST") return
@@ -119,7 +120,7 @@ class MainService : Service() {
         val appName = if (parts.size > 3) parts.drop(3).joinToString(" ") else "unknown"
 
         // Store writer mapped by reqId so the broadcast receiver can respond
-        PendingRequest.store(reqId, uid, writer)
+        PendingRequest.store(reqId, writer)
 
         val intent = Intent(this, NotificationActionReceiver::class.java).apply {
             putExtra("req_id", reqId)

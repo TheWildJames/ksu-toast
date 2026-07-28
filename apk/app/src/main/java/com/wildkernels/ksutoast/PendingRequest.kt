@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap
 object PendingRequest {
     private val requests = ConcurrentHashMap<String, PrintWriter>()
 
-    fun store(reqId: String, uid: Int, writer: PrintWriter) {
+    fun store(reqId: String, writer: PrintWriter) {
         requests[reqId] = writer
     }
 
