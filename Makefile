@@ -51,6 +51,7 @@ module: wrapper daemon apk
 	cp customize.sh $(BUILD_DIR)/
 	cp post-fs-data.sh $(BUILD_DIR)/
 	cp service.sh $(BUILD_DIR)/
+	cp boot-completed.sh $(BUILD_DIR)/
 	cp action.sh $(BUILD_DIR)/
 	cp sepolicy.rule $(BUILD_DIR)/
 

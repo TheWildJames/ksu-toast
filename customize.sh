@@ -1,32 +1,40 @@
 #!/system/bin/sh
 
 # KSU Toast - Module Installer
-# This runs during module installation via the KSU Manager
+# Runs during module installation via KSU Manager
 
 MODDIR=${0%/*}
+PERSISTENT_DIR=/data/adb/ksu-toast
 
 ui_print "- Installing KSU Toast v${VERSION}"
 
-# Ensure directories exist
-mkdir -p /data/adb/ksu-toast
+# Ensure persistent directory exists
+mkdir -p "$PERSISTENT_DIR"
+mkdir -p "$PERSISTENT_DIR/config"
 
 # Copy daemon binary
-cp "$MODDIR/daemon/ksu-toastd" /data/adb/ksu-toast/ksu-toastd
-chmod 0755 /data/adb/ksu-toast/ksu-toastd
+cp "$MODDIR/daemon/ksu-toastd" "$PERSISTENT_DIR/ksu-toastd"
+chmod 0755 "$PERSISTENT_DIR/ksu-toastd"
 
-# Install companion APK
-cp "$MODDIR/apk/KsuToast.apk" /data/adb/ksu-toast/KsuToast.apk
-chmod 0644 /data/adb/ksu-toast/KsuToast.apk
+# Initialize deny list and allow cache
+touch "$PERSISTENT_DIR/deny.list"
+touch "$PERSISTENT_DIR/allow.cache"
+chmod 0644 "$PERSISTENT_DIR/deny.list"
+chmod 0644 "$PERSISTENT_DIR/allow.cache"
 
-# Create config directory
-mkdir -p /data/adb/ksu-toast/config
-touch /data/adb/ksu-toast/deny.list
-touch /data/adb/ksu-toast/allow.cache
-chmod 0644 /data/adb/ksu-toast/deny.list
-chmod 0644 /data/adb/ksu-toast/allow.cache
-
-# Create sepolicy backup dir
-mkdir -p /data/adb/ksu-toast/sepolicy
+# Install companion APK — pm works here during module installation
+if [ -f "$MODDIR/apk/KsuToast.apk" ]; then
+    cp "$MODDIR/apk/KsuToast.apk" "$PERSISTENT_DIR/KsuToast.apk"
+    chmod 0644 "$PERSISTENT_DIR/KsuToast.apk"
+    pm install -r "$PERSISTENT_DIR/KsuToast.apk" 2>&1 </dev/null | grep -v "^\s*$"
+    if pm path com.wildkernels.ksutoast >/dev/null 2>&1; then
+        ui_print "- Companion APK installed"
+    else
+        ui_print "- Companion APK will install on next boot"
+    fi
+else
+    ui_print "- WARNING: KsuToast.apk not found in module"
+fi
 
 ui_print "- Installation complete"
 ui_print "- Reboot to activate KSU Toast"

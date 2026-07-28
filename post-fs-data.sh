@@ -1,21 +1,14 @@
 #!/system/bin/sh
 
 # KSU Toast - post-fs-data.sh
-# Installs companion APK on every boot (in case it was removed)
+# Early boot script. Runs before system is fully booted.
+# Just ensures data directory exists — APK install and daemon
+# start happen in boot-completed.sh where pm is available.
 
 MODDIR=${0%/*}
+PERSISTENT_DIR=/data/adb/ksu-toast
 
-# Install/update companion APK if it exists in our module
-if [ -f "$MODDIR/apk/KsuToast.apk" ]; then
-    cp "$MODDIR/apk/KsuToast.apk" /data/adb/ksu-toast/KsuToast.apk
-    chmod 0644 /data/adb/ksu-toast/KsuToast.apk
+mkdir -p "$PERSISTENT_DIR/config"
 
-    # Install the APK (package manager)
-    # Use pm install with -r to reinstall if already present
-    if [ -f /data/adb/ksu-toast/KsuToast.apk ]; then
-        pm install -r /data/adb/ksu-toast/KsuToast.apk 2>/dev/null || true
-    fi
-fi
-
-# Default timeout for root request (seconds)
+# Set default timeout (seconds) for root request UI
 setprop ksu.toast.timeout 10

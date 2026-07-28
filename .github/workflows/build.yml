@@ -94,6 +94,7 @@ jobs:
           cp customize.sh "$MODULE_DIR/" 2>/dev/null || true
           cp post-fs-data.sh "$MODULE_DIR/" 2>/dev/null || true
           cp service.sh "$MODULE_DIR/" 2>/dev/null || true
+          cp boot-completed.sh "$MODULE_DIR/" 2>/dev/null || true
           cp action.sh "$MODULE_DIR/" 2>/dev/null || true
           cp sepolicy.rule "$MODULE_DIR/" 2>/dev/null || true
 
