@@ -19,6 +19,8 @@ android {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            // Sign with auto-generated debug keystore so pm install accepts it
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
