@@ -60,18 +60,36 @@ echo ""
 echo "═══ Test: trigger root request ═══"
 echo ""
 
-# Attempt a test su call. This hits the su-wrapper → daemon flow.
-# If daemon is running, it should ask the user via notification.
-echo "Running: su -c id"
-echo "(this will trigger a notification if daemon is running)"
-echo ""
-TEST_OUTPUT=$(su -c id 2>&1 </dev/null) && {
-    echo "✓ ROOT ACCESS GRANTED"
-    echo "  uid=$(echo "$TEST_OUTPUT" | grep -o 'uid=[^ ]*' || echo "unknown")"
-} || {
-    echo "✗ Root request denied or timed out"
-    echo "  (expected if daemon not running or no user response)"
-}
+SOCKET="$PERSISTENT_DIR/daemon.sock"
+BUSYBOX=/data/adb/ksu/bin/busybox
+
+if [ -S "$SOCKET" ]; then
+    # Send a fake CHECK with UID 99999 (not in any list) to trigger
+    # the full daemon → APK → notification flow, exactly as if a
+    # real unknown app requested root. No actual root is granted.
+    echo "Sending test request to daemon (UID 99999, app TestApp)..."
+    echo ""
+    TEST_RESULT=$(echo "CHECK 99999 TestApp" | $BUSYBOX nc -w 3 "$SOCKET" 2>&1 </dev/null) || true
+    if echo "$TEST_RESULT" | grep -q "ALLOWED"; then
+        echo "✓ Daemon responded: ROOT GRANTED (would be allowed)"
+    elif echo "$TEST_RESULT" | grep -q "DENIED"; then
+        echo "⚠ Daemon responded: DENIED (check APK notification)"
+        echo "  (A notification should appear within 10 seconds)"
+    else
+        echo "⚠ Daemon response: $TEST_RESULT"
+        echo "  (Notification may already be showing)"
+    fi
+else
+    # Fallback: direct su test
+    echo "Daemon socket not available — testing su-wrapper directly."
+    echo ""
+    TEST_OUTPUT=$(su -c id 2>&1 </dev/null) && {
+        echo "✓ ROOT ACCESS GRANTED via ksud (direct path)"
+        echo "  uid=$(echo "$TEST_OUTPUT" | grep -o 'uid=[^ ]*' || echo "unknown")"
+    } || {
+        echo "✗ Root request denied"
+    }
+fi
 
 echo ""
 echo "═══ Help ═══"
