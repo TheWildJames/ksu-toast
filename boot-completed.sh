@@ -17,10 +17,15 @@ DAEMON_PID="$PERSISTENT_DIR/daemon.pid"
 if [ -f "$MODDIR/apk/KsuToast.apk" ]; then
     cp "$MODDIR/apk/KsuToast.apk" "$PERSISTENT_DIR/KsuToast.apk"
     chmod 0644 "$PERSISTENT_DIR/KsuToast.apk"
-    pm install -r "$PERSISTENT_DIR/KsuToast.apk" 2>&1 </dev/null | grep -v "^\s*$"
+    # Copy to /data/local/tmp for SELinux-friendly pm install
+    cp "$MODDIR/apk/KsuToast.apk" /data/local/tmp/KsuToast.apk
+    pm install -r /data/local/tmp/KsuToast.apk 2>&1 </dev/null | grep -v "^\s*$"
+    rm -f /data/local/tmp/KsuToast.apk
 elif [ -f "$PERSISTENT_DIR/KsuToast.apk" ]; then
     # Fallback — reinstall from persistent storage
-    pm install -r "$PERSISTENT_DIR/KsuToast.apk" 2>&1 </dev/null | grep -v "^\s*$"
+    cp "$PERSISTENT_DIR/KsuToast.apk" /data/local/tmp/KsuToast.apk
+    pm install -r /data/local/tmp/KsuToast.apk 2>&1 </dev/null | grep -v "^\s*$"
+    rm -f /data/local/tmp/KsuToast.apk
 fi
 
 if pm path com.wildkernels.ksutoast >/dev/null 2>&1; then
