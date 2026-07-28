@@ -6,6 +6,11 @@
  * with the companion APK for user-facing notifications.
  *
  * Compile with: aarch64-linux-android-clang -static -Os -s -o ksu-toastd ksu-toastd.c
+ *
+ * Contains techniques inspired by backslashxx/ksu_toolkit
+ * ( https://github.com/backslashxx/ksu_toolkit ) — specifically the
+ * KSU_IOCTL_GET_MANAGER_UID ioctl approach for querying the manager
+ * app UID from the kernel, replacing fragile filesystem parsing.
  */
 
 #define _GNU_SOURCE
@@ -32,7 +37,6 @@
 #define ALLOW_CACHE     "/data/adb/ksu-toast/allow.cache"
 #define PID_FILE        "/data/adb/ksu-toast/daemon.pid"
 #define MODULE_DIR      "/data/adb/modules/ksu_toast"
-#define PACKAGES_LIST   "/data/system/packages.list"
 
 #define SOCKET_BACKLOG  16
 /* Use a guard since NDK already defines LINE_MAX */
@@ -52,7 +56,12 @@
 #define KSU_SELINUX_DOMAIN  64
 
 /* Compute ioctl numbers matching KSU's uapi/supercall.h */
-#define KSU_IOCTL_SET_APP_PROFILE  _IOC(_IOC_WRITE, 'K', 12, 0)
+#define KSU_IOCTL_SET_APP_PROFILE   _IOC(_IOC_WRITE, 'K', 12, 0)
+#define KSU_IOCTL_GET_MANAGER_UID   _IOC(_IOC_READ,  'K', 10, 0)
+
+struct ksu_get_manager_uid_cmd {
+    __u32 uid;
+};
 
 /* ── Structs matching KSU UAPI ─────────────────────────── */
 struct __attribute__((packed)) root_profile {
@@ -120,33 +129,27 @@ static int file_append(const char *path, int uid) {
     return 0;
 }
 
-/* Resolve the KSU Next manager app's UID by parsing packages.list */
+/* Resolve the KSU Next manager app's UID via the kernel module.
+ * Uses KSU_IOCTL_GET_MANAGER_UID — the proper KSU API — instead of
+ * parsing /data/system/packages.list.
+ *
+ * Technique from backslashxx/ksu_toolkit. */
 static int resolve_manager_uid(void) {
-    /* Try reading from packages.list */
-    FILE *f = fopen(PACKAGES_LIST, "re");
-    if (!f) return -1;
+    /* Open the ksu driver fd via the backdoored SYS_reboot hook */
+    int ksu_fd = -1;
+    long ret = syscall(SYS_reboot, KSU_INSTALL_MAGIC1, KSU_INSTALL_MAGIC2, 0, &ksu_fd);
+    if (ret != 0 || ksu_fd < 0)
+        return -1;
 
-    /* Known KSU Next manager package names */
-    const char *managers[] = {
-        "com.rifsxd.ksunext",
-        NULL
-    };
+    /* Query the manager UID from the kernel */
+    struct ksu_get_manager_uid_cmd cmd = {0};
+    ret = ioctl(ksu_fd, KSU_IOCTL_GET_MANAGER_UID, &cmd);
+    close(ksu_fd);
 
-    char line[1024];
-    while (fgets(line, sizeof(line), f)) {
-        for (int i = 0; managers[i]; i++) {
-            size_t plen = strlen(managers[i]);
-            if (strncmp(line, managers[i], plen) == 0 && line[plen] == ' ') {
-                int uid;
-                if (sscanf(line + plen + 1, "%d", &uid) == 1) {
-                    fclose(f);
-                    return uid;
-                }
-            }
-        }
-    }
-    fclose(f);
-    return -1;
+    if (ret != 0 || cmd.uid == 0)
+        return -1;
+
+    return (int)cmd.uid;
 }
 
 /* Remove socket file and create a listening Unix socket */
