@@ -26,8 +26,9 @@ if ! pm path com.wildkernels.ksutoast >/dev/null 2>&1; then
     fi
 fi
 
-# Grant notification permission — runs as root, no user prompt needed
+# Grant permissions — runs as root, no user prompt needed
 pm grant com.wildkernels.ksutoast android.permission.POST_NOTIFICATIONS 2>/dev/null || true
+pm grant com.wildkernels.ksutoast android.permission.SYSTEM_ALERT_WINDOW 2>/dev/null || true
 
 # 2. Start daemon if not already running
 if [ -f "$DAEMON_PID" ]; then
