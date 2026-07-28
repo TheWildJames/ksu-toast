@@ -56,9 +56,9 @@ jobs:
           TOOLCHAIN="${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64"
           CC="$TOOLCHAIN/bin/aarch64-linux-android33-clang"
           $CC -static -Os -s -Wall -Wextra -pthread -o ksu-toastd daemon/ksu-toastd.c
-          mkdir -p build/daemon
-          cp ksu-toastd build/daemon/
-          file build/daemon/ksu-toastd
+          mkdir -p build/system/bin
+          cp ksu-toastd build/system/bin/
+          file build/system/bin/ksu-toastd
         shell: bash
 
       - name: Setup Java

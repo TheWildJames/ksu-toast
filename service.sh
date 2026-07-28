@@ -1,7 +1,7 @@
 #!/system/bin/sh
 
 # KSU Toast - service.sh
-# late_start service mode. Hardcoded MODDIR — same reason as boot-completed.
+# late_start service mode. Daemon at system overlay path.
 
 MODDIR=/data/adb/modules/ksu_toast
 PERSISTENT_DIR=/data/adb/ksu-toast
@@ -9,7 +9,8 @@ SOCKET="$PERSISTENT_DIR/daemon.sock"
 APK_SOCKET="$PERSISTENT_DIR/apk.sock"
 DENY_LIST="$PERSISTENT_DIR/deny.list"
 CACHE="$PERSISTENT_DIR/allow.cache"
-DAEMON="$MODDIR/daemon/ksu-toastd"
+# Daemon at system overlay path — guaranteed accessible by KSU mount
+DAEMON=/system/bin/ksu-toastd
 DAEMON_PID="$PERSISTENT_DIR/daemon.pid"
 LOG="$PERSISTENT_DIR/daemon.log"
 
@@ -20,15 +21,6 @@ if [ -f "$DAEMON_PID" ]; then
 fi
 
 rm -f "$SOCKET" "$APK_SOCKET"
-
-# If daemon not at expected path, try to find it elsewhere in module
-if [ ! -x "$DAEMON" ]; then
-    FOUND=$(find "$MODDIR" -name "ksu-toastd" -type f 2>/dev/null | head -1)
-    if [ -n "$FOUND" ] && [ "$FOUND" != "$DAEMON" ]; then
-        cp "$FOUND" "$DAEMON" 2>/dev/null
-        chmod 0755 "$DAEMON" 2>/dev/null
-    fi
-fi
 
 if [ -x "$DAEMON" ]; then
     mkdir -p "$PERSISTENT_DIR"
@@ -48,5 +40,5 @@ if [ -x "$DAEMON" ]; then
         echo "[ksu-toast] Daemon failed to start — check $LOG"
     fi
 else
-    echo "[ksu-toast] Daemon binary not found at $DAEMON" >> "$LOG" 2>/dev/null || true
+    echo "[ksu-toast] Daemon not found at $DAEMON" >> "$LOG" 2>/dev/null || true
 fi

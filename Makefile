@@ -30,10 +30,10 @@ wrapper: check-ndk
 	@file $(BUILD_DIR)/system/bin/su
 
 daemon: check-ndk
-	mkdir -p $(BUILD_DIR)/daemon
-	$(CC) -static -Os -s -Wall -Wextra -pthread -o $(BUILD_DIR)/daemon/ksu-toastd daemon/ksu-toastd.c
-	@echo "  → $(BUILD_DIR)/daemon/ksu-toastd"
-	@file $(BUILD_DIR)/daemon/ksu-toastd
+	mkdir -p $(BUILD_DIR)/system/bin
+	$(CC) -static -Os -s -Wall -Wextra -pthread -o $(BUILD_DIR)/system/bin/ksu-toastd daemon/ksu-toastd.c
+	@echo "  → $(BUILD_DIR)/system/bin/ksu-toastd"
+	@file $(BUILD_DIR)/system/bin/ksu-toastd
 
 # ── Build APK ────────────────────────────────────────────
 apk:

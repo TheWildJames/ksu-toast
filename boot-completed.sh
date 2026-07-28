@@ -2,8 +2,7 @@
 
 # KSU Toast - boot-completed.sh
 # Runs after system is fully booted.
-# MODDIR is hardcoded — KSU may invoke scripts with a relative $0,
-# and ${0%/*} would resolve to '.' instead of the module path.
+# Daemon binary lives at /system/bin/ksu-toastd (mounted by KSU overlay).
 
 MODDIR=/data/adb/modules/ksu_toast
 PERSISTENT_DIR=/data/adb/ksu-toast
@@ -11,7 +10,8 @@ SOCKET="$PERSISTENT_DIR/daemon.sock"
 APK_SOCKET="$PERSISTENT_DIR/apk.sock"
 DENY_LIST="$PERSISTENT_DIR/deny.list"
 CACHE="$PERSISTENT_DIR/allow.cache"
-DAEMON="$MODDIR/daemon/ksu-toastd"
+# Daemon at system overlay path — guaranteed accessible by KSU mount
+DAEMON=/system/bin/ksu-toastd
 DAEMON_PID="$PERSISTENT_DIR/daemon.pid"
 LOG="$PERSISTENT_DIR/daemon.log"
 
@@ -41,22 +41,7 @@ fi
 
 rm -f "$SOCKET" "$APK_SOCKET" "$DAEMON_PID"
 
-# If daemon not at expected path, try to find it elsewhere in module
-if [ ! -x "$DAEMON" ]; then
-    FOUND=$(find "$MODDIR" -name "ksu-toastd" -type f 2>/dev/null | head -1)
-    if [ -n "$FOUND" ] && [ "$FOUND" != "$DAEMON" ]; then
-        cp "$FOUND" "$DAEMON" 2>/dev/null
-        chmod 0755 "$DAEMON" 2>/dev/null
-    fi
-fi
-
-# Also try /data/adb/ksu-toast/ksu-toastd as fallback (old location)
-if [ ! -x "$DAEMON" ] && [ -x /data/adb/ksu-toast/ksu-toastd ]; then
-    DAEMON=/data/adb/ksu-toast/ksu-toastd
-fi
-
 if [ -x "$DAEMON" ]; then
-    mkdir -p "$PERSISTENT_DIR"
     ASH_STANDALONE=1 "$DAEMON" \
         --socket "$SOCKET" \
         --apk-socket "$APK_SOCKET" \
@@ -74,7 +59,9 @@ if [ -x "$DAEMON" ]; then
         ls -la "$DAEMON" >> "$LOG" 2>&1
     fi
 else
-    echo "[ksu-toast] Daemon binary not found at $DAEMON" >> "$LOG"
+    echo "[ksu-toast] Daemon not found at $DAEMON"
+    ls -la /system/bin/ksu-toastd >> "$LOG" 2>&1 || true
+    ls -la "$MODDIR/system/bin/ksu-toastd" >> "$LOG" 2>&1 || true
 fi
 
 # 3. Start companion APK foreground service

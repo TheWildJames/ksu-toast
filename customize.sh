@@ -24,6 +24,11 @@ ui_print "- Installing KSU Toast v$versionCode"
 # Binaries stay in the module directory — no copy needed
 mkdir -p "$PERSISTENT_DIR"
 
+# Verify daemon binary is present (in system/bin/, mounted by KSU overlay)
+if [ -f "$MODPATH/system/bin/ksu-toastd" ]; then
+    ui_print "- Daemon found ($(wc -c < "$MODPATH/system/bin/ksu-toastd") bytes)"
+fi
+
 touch "$PERSISTENT_DIR/deny.list"
 touch "$PERSISTENT_DIR/allow.cache"
 chmod 0644 "$PERSISTENT_DIR/deny.list"
