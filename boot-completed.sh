@@ -49,14 +49,15 @@ if [ -x "$DAEMON" ]; then
         --apk-socket "$APK_SOCKET" \
         --deny-list "$DENY_LIST" \
         --cache "$CACHE" \
-        --config "$PERSISTENT_DIR/config" &
+        --config "$PERSISTENT_DIR/config" \
+        > "$PERSISTENT_DIR/daemon.log" 2>&1 &
     echo $! > "$DAEMON_PID"
     sleep 1
 
     if [ -S "$SOCKET" ]; then
         echo "[ksu-toast] Daemon started (pid: $(cat $DAEMON_PID))"
     else
-        echo "[ksu-toast] Daemon failed to start"
+        echo "[ksu-toast] Daemon failed to start — check daemon.log"
     fi
 else
     echo "[ksu-toast] Daemon binary not found at $DAEMON"

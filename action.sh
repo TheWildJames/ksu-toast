@@ -30,6 +30,14 @@ else
     echo "✗ Daemon socket missing"
 fi
 
+# Show last few lines of daemon log if something's wrong
+if [ ! -S "$PERSISTENT_DIR/daemon.sock" ] && [ -f "$PERSISTENT_DIR/daemon.log" ]; then
+    echo ""
+    echo "═══ Daemon log (last 5 lines) ═══"
+    tail -5 "$PERSISTENT_DIR/daemon.log" 2>/dev/null
+    echo ""
+fi
+
 DENY="$PERSISTENT_DIR/deny.list"
 [ -f "$DENY" ] && echo "✓ Deny list: $(wc -l < "$DENY") entries" || echo "✗ Deny list missing"
 
