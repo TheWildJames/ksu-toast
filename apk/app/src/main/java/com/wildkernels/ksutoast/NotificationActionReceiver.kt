@@ -20,7 +20,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
         // Dismiss the notification
         if (uid >= 0) {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            nm.cancel(MainService.NOTIF_ID_BASE + uid)
+            nm.cancel(NOTIF_ID_BASE + uid)
         }
 
         // Send response back to daemon
