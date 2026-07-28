@@ -52,5 +52,8 @@ else
     ui_print "- WARNING: KsuToast.apk not found at $APK_SRC"
 fi
 
+# Clean up — apk/ only needed during install, remove from module dir
+rm -rf "$MODPATH/apk"
+
 ui_print "- Installation complete"
 ui_print "- Reboot to activate KSU Toast"
