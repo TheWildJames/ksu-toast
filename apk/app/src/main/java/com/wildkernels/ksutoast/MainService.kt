@@ -11,7 +11,9 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.PrintWriter
 import java.net.ServerSocket
-import java.net.Socket
+
+/** Base notification ID — offset by UID for uniqueness */
+const val NOTIF_ID_BASE = 1000
 
 /**
  * Foreground service that listens on a Unix socket for root requests
@@ -27,7 +29,6 @@ class MainService : Service() {
 
     private val CHANNEL_ID = "ksu_toast_requests"
     private val NOTIF_ID_SERVICE = 1
-    private val NOTIF_ID_BASE = 1000 // + uid for uniqueness
 
     private var running = true
     private var serverSocket: ServerSocket? = null
@@ -161,17 +162,35 @@ class MainService : Service() {
 
         val grantIntent = PendingIntent.getBroadcast(
             this, uid * 3 + 0,
-            intent.clonePacket().apply { putExtra("action", "GRANT") },
+            Intent(this, NotificationActionReceiver::class.java).apply {
+                putExtra("req_id", reqId)
+                putExtra("uid", uid)
+                putExtra("app_name", appName)
+                putExtra("action", "GRANT")
+                action = "com.wildkernels.ksutoast.ACTION_RESPOND_$reqId"
+            },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val denyIntent = PendingIntent.getBroadcast(
             this, uid * 3 + 1,
-            intent.clonePacket().apply { putExtra("action", "DENY") },
+            Intent(this, NotificationActionReceiver::class.java).apply {
+                putExtra("req_id", reqId)
+                putExtra("uid", uid)
+                putExtra("app_name", appName)
+                putExtra("action", "DENY")
+                action = "com.wildkernels.ksutoast.ACTION_RESPOND_$reqId"
+            },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val ignoreIntent = PendingIntent.getBroadcast(
             this, uid * 3 + 2,
-            intent.clonePacket().apply { putExtra("action", "IGNORE") },
+            Intent(this, NotificationActionReceiver::class.java).apply {
+                putExtra("req_id", reqId)
+                putExtra("uid", uid)
+                putExtra("app_name", appName)
+                putExtra("action", "IGNORE")
+                action = "com.wildkernels.ksutoast.ACTION_RESPOND_$reqId"
+            },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
