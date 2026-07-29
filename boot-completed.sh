@@ -42,8 +42,8 @@ fi
 
 rm -f "$SOCKET" "$DAEMON_PID"
 # APK socket is abstract (\0ksu-toast-apk) — no filesystem file to remove
-
 if [ -x "$DAEMON" ]; then
+    mkdir -p "$PERSISTENT_DIR"
     ASH_STANDALONE=1 "$DAEMON" \
         --socket "$SOCKET" \
         --apk-socket "$APK_SOCKET" \
@@ -53,6 +53,9 @@ if [ -x "$DAEMON" ]; then
         > "$LOG" 2>&1 &
     echo $! > "$DAEMON_PID"
     sleep 1
+
+    # Fix SELinux context on APK socket so the companion app can connect
+    chcon u:object_r:app_data_file:s0 "$APK_SOCKET" 2>/dev/null || true
 
     if [ -S "$SOCKET" ]; then
         echo "[ksu-toast] Daemon started (pid: $(cat $DAEMON_PID))"
