@@ -54,6 +54,7 @@ module: wrapper daemon apk
 	cp boot-completed.sh $(BUILD_DIR)/
 	cp action.sh $(BUILD_DIR)/
 	cp sepolicy.rule $(BUILD_DIR)/
+	cp -r webroot $(BUILD_DIR)/
 
 	# Generate final module.prop with version
 	sed -i "s/^version=.*/version=v$(VERSION)/" $(BUILD_DIR)/module.prop

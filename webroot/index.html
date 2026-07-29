@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>KSU Toast</title>
+    <script type="importmap">
+    {
+        "imports": {
+            "kernelsu-alt": "https://esm.sh/kernelsu-alt"
+        }
+    }
+    </script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <header>
+            <div class="header-content">
+                <h1>KSU Toast</h1>
+                <span id="version"></span>
+            </div>
+            <nav>
+                <button class="tab active" data-tab="dashboard">Dashboard</button>
+                <button class="tab" data-tab="logs">Logs</button>
+                <button class="tab" data-tab="deny">Deny List</button>
+                <button class="tab" data-tab="config">Config</button>
+            </nav>
+        </header>
+
+        <main>
+            <!-- Dashboard -->
+            <section id="dashboard" class="tab-content active">
+                <div class="cards">
+                    <div class="card">
+                        <div class="card-label">Daemon</div>
+                        <div class="card-value" id="daemon-status">—</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-label">Socket</div>
+                        <div class="card-value" id="socket-status">—</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-label">Deny List</div>
+                        <div class="card-value" id="deny-count">—</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-label">Allow Cache</div>
+                        <div class="card-value" id="cache-count">—</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-label">Timeout</div>
+                        <div class="card-value" id="timeout-value">—</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-label">APK</div>
+                        <div class="card-value" id="apk-status">—</div>
+                    </div>
+                </div>
+                <button class="btn" id="refresh-dashboard">Refresh</button>
+            </section>
+
+            <!-- Logs -->
+            <section id="logs" class="tab-content">
+                <div class="log-controls">
+                    <button class="btn" id="refresh-logs">Refresh</button>
+                    <button class="btn danger" id="clear-logs">Clear</button>
+                    <label class="auto-refresh">
+                        <input type="checkbox" id="auto-refresh"> Auto-refresh (5s)
+                    </label>
+                </div>
+                <pre id="log-content" class="log-box">Loading...</pre>
+            </section>
+
+            <!-- Deny List -->
+            <section id="deny" class="tab-content">
+                <div class="list-controls">
+                    <button class="btn" id="refresh-deny">Refresh</button>
+                    <button class="btn danger" id="clear-deny">Clear All</button>
+                </div>
+                <div id="deny-content" class="list-box">Loading...</div>
+            </section>
+
+            <!-- Config -->
+            <section id="config" class="tab-content">
+                <div class="config-group">
+                    <label>Notification Timeout (seconds)</label>
+                    <div class="slider-row">
+                        <input type="range" id="timeout-slider" min="5" max="60" value="10">
+                        <span id="timeout-display">10s</span>
+                    </div>
+                    <button class="btn" id="save-timeout">Save</button>
+                </div>
+                <div class="config-group">
+                    <label>Allow Cache</label>
+                    <button class="btn danger" id="clear-cache">Clear Allow Cache</button>
+                </div>
+                <div class="config-group">
+                    <label>Daemon</label>
+                    <button class="btn" id="restart-daemon">Restart Daemon</button>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script type="module" src="app.js"></script>
+</body>
+</html>

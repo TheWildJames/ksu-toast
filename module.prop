@@ -5,3 +5,4 @@ versionCode=1
 author=WildKernels
 description=Notification-based root authorization for KernelSU Next. Shows Grant/Deny/Ignore notifications when apps request root.
 updateJson=https://raw.githubusercontent.com/TheWildJames/ksu-toast/main/update.json
+webuiIcon=webroot/icon.png
