@@ -123,22 +123,6 @@ class MainService : Service() {
         }
     }
 
-    /** Handle an active connection — read requests from daemon */
-    private fun handleConnection(socket: LocalSocket) {
-        try {
-            val reader = BufferedReader(InputStreamReader(socket.inputStream))
-            val writer = PrintWriter(socket.outputStream, true)
-
-            while (running) {
-                val line = reader.readLine() ?: break
-                handleRequest(line, writer)
-            }
-        } catch (_: Exception) {
-        } finally {
-            try { socket.close() } catch (_: Exception) {}
-        }
-    }
-
     /** Write a status line to debug file */
     private fun writeStatus(msg: String) {
         try {
