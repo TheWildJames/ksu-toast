@@ -66,8 +66,10 @@ else
 fi
 
 # 3. Start companion APK foreground service via launcher activity.
-# Launching an activity first satisfies Android 12+ foreground
-# service restrictions (background apps can't start FGS directly).
+# FLAG_ACTIVITY_NEW_TASK (0x10000000) required for starting
+# activities from shell context. Also fall back to direct
+# start-foreground-service in case activity approach fails.
 if pm path com.wildkernels.ksutoast >/dev/null 2>&1; then
-    am start -n com.wildkernels.ksutoast/.LauncherActivity >/dev/null 2>&1 || true
+    am start -n com.wildkernels.ksutoast/.LauncherActivity -f 0x10000000 >/dev/null 2>&1 || \
+    am start-foreground-service -n com.wildkernels.ksutoast/.MainService >/dev/null 2>&1 || true
 fi
