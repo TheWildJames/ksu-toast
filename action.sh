@@ -1,12 +1,12 @@
 #!/system/bin/sh
 # KSU Toast - Action button script
-# Shows everything in one place: status, logs, test results.
-# No need to hunt for separate files.
+# Shows everything: status → test → logs.
+# Logs are catted AFTER the test so they include new entries.
 
 MODDIR=${0%/*}
 PERSISTENT_DIR=/data/adb/ksu-toast
 SOCKET="$PERSISTENT_DIR/daemon.sock"
-DAEMON="$PERSISTENT_DIR/daemon.log"
+DAEMON_LOG="$PERSISTENT_DIR/daemon.log"
 APK_STATUS="/data/data/com.wildkernels.ksutoast/files/ksu-toast-apk-status.txt"
 
 echo "╔══════════════════════════════════╗"
@@ -26,43 +26,17 @@ else
 fi
 
 [ -S "$SOCKET" ] && echo "SOCKET: ready" || echo "SOCKET: missing"
-
 [ -f "$PERSISTENT_DIR/deny.list" ] && echo "DENY LIST: $(wc -l < "$PERSISTENT_DIR/deny.list") entries"
 [ -f "$PERSISTENT_DIR/allow.cache" ] && echo "ALLOW CACHE: $(wc -l < "$PERSISTENT_DIR/allow.cache") entries"
-
-if [ -f /system/bin/su ] && file /system/bin/su 2>/dev/null | grep -q ELF; then
-    echo "SU WRAPPER: active (binary)"
-else
-    echo "SU WRAPPER: symlink only"
-fi
-
+file /system/bin/su 2>/dev/null | grep -q ELF && echo "SU WRAPPER: active (binary)" || echo "SU WRAPPER: symlink only"
 pm path com.wildkernels.ksutoast >/dev/null 2>&1 && echo "APK: installed" || echo "APK: not installed"
 
-# ── 2. Daemon log (always shown) ──────────────────────────
-echo ""
-echo "═══ Daemon log ═══"
-if [ -f "$DAEMON" ]; then
-    cat "$DAEMON" 2>/dev/null || echo "(empty)"
-else
-    echo "(no log file)"
-fi
-
-# ── 3. APK connection status ──────────────────────────────
-echo ""
-echo "═══ APK connection ═══"
-if [ -f "$APK_STATUS" ]; then
-    cat "$APK_STATUS" 2>/dev/null
-else
-    echo "(no status file — APK may not have tried to connect yet)"
-    echo "(retries every 3 seconds after service starts)"
-fi
-
-# ── 4. Test ───────────────────────────────────────────────
+# ── 2. Test ───────────────────────────────────────────────
 echo ""
 echo "═══ Test: simulate root request ═══"
 
 if [ -S "$SOCKET" ]; then
-    # Start APK service
+    # Start APK service (in case not already running)
     am start -n com.wildkernels.ksutoast/.LauncherActivity -f 0x10000000 >/dev/null 2>&1 || \
     am start-foreground-service -n com.wildkernels.ksutoast/.MainService >/dev/null 2>&1 || true
 
@@ -104,6 +78,24 @@ else
         echo "→ su failed"
 fi
 
+# ── 3. Daemon log (catted after test — includes test results) ───
+echo ""
+echo "═══ Daemon log ═══"
+if [ -f "$DAEMON_LOG" ]; then
+    cat "$DAEMON_LOG" 2>/dev/null || echo "(empty)"
+else
+    echo "(no log)"
+fi
+
+# ── 4. APK connection status (catted after test) ────────────
+echo ""
+echo "═══ APK connection status ═══"
+if [ -f "$APK_STATUS" ]; then
+    cat "$APK_STATUS" 2>/dev/null
+else
+    echo "(no status file — APK service may not have started)"
+fi
+
 echo ""
 echo "═══ End ═══"
-echo "Full logs: $DAEMON, $APK_STATUS"
+echo "Logs: $DAEMON_LOG | $APK_STATUS"
