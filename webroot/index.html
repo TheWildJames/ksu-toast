@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KSU Toast</title>
+    <link rel="stylesheet" href="style.css">
     <script type="importmap">
     {
         "imports": {
@@ -11,97 +12,127 @@
         }
     }
     </script>
-    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="app">
-        <header>
-            <div class="header-content">
-                <h1>KSU Toast</h1>
-                <span id="version"></span>
-            </div>
-            <nav>
-                <button class="tab active" data-tab="dashboard">Dashboard</button>
-                <button class="tab" data-tab="logs">Logs</button>
-                <button class="tab" data-tab="deny">Deny List</button>
-                <button class="tab" data-tab="config">Config</button>
-            </nav>
-        </header>
-
-        <main>
-            <!-- Dashboard -->
-            <section id="dashboard" class="tab-content active">
-                <div class="cards">
-                    <div class="card">
-                        <div class="card-label">Daemon</div>
-                        <div class="card-value" id="daemon-status">—</div>
-                    </div>
-                    <div class="card">
-                        <div class="card-label">Socket</div>
-                        <div class="card-value" id="socket-status">—</div>
-                    </div>
-                    <div class="card">
-                        <div class="card-label">Deny List</div>
-                        <div class="card-value" id="deny-count">—</div>
-                    </div>
-                    <div class="card">
-                        <div class="card-label">Allow Cache</div>
-                        <div class="card-value" id="cache-count">—</div>
-                    </div>
-                    <div class="card">
-                        <div class="card-label">Timeout</div>
-                        <div class="card-value" id="timeout-value">—</div>
-                    </div>
-                    <div class="card">
-                        <div class="card-label">APK</div>
-                        <div class="card-value" id="apk-status">—</div>
-                    </div>
-                </div>
-                <button class="btn" id="refresh-dashboard">Refresh</button>
-            </section>
-
-            <!-- Logs -->
-            <section id="logs" class="tab-content">
-                <div class="log-controls">
-                    <button class="btn" id="refresh-logs">Refresh</button>
-                    <button class="btn danger" id="clear-logs">Clear</button>
-                    <label class="auto-refresh">
-                        <input type="checkbox" id="auto-refresh"> Auto-refresh (5s)
-                    </label>
-                </div>
-                <pre id="log-content" class="log-box">Loading...</pre>
-            </section>
-
-            <!-- Deny List -->
-            <section id="deny" class="tab-content">
-                <div class="list-controls">
-                    <button class="btn" id="refresh-deny">Refresh</button>
-                    <button class="btn danger" id="clear-deny">Clear All</button>
-                </div>
-                <div id="deny-content" class="list-box">Loading...</div>
-            </section>
-
-            <!-- Config -->
-            <section id="config" class="tab-content">
-                <div class="config-group">
-                    <label>Notification Timeout (seconds)</label>
-                    <div class="slider-row">
-                        <input type="range" id="timeout-slider" min="5" max="60" value="10">
-                        <span id="timeout-display">10s</span>
-                    </div>
-                    <button class="btn" id="save-timeout">Save</button>
-                </div>
-                <div class="config-group">
-                    <label>Allow Cache</label>
-                    <button class="btn danger" id="clear-cache">Clear Allow Cache</button>
-                </div>
-                <div class="config-group">
-                    <label>Daemon</label>
-                    <button class="btn" id="restart-daemon">Restart Daemon</button>
-                </div>
-            </section>
-        </main>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-title">
+            <span id="title">KSU Toast</span>
+            <span id="version"></span>
+        </div>
     </div>
+
+    <!-- Dashboard -->
+    <div class="page active" id="page-dashboard">
+        <div class="section-label">Status</div>
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-label">Daemon</div>
+                <div class="card-value" id="daemon-status">—</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Socket</div>
+                <div class="card-value" id="socket-status">—</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Deny List</div>
+                <div class="card-value" id="deny-count">—</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Cache</div>
+                <div class="card-value" id="cache-count">—</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Timeout</div>
+                <div class="card-value" id="timeout-value">—</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Companion</div>
+                <div class="card-value" id="apk-status">—</div>
+            </div>
+        </div>
+        <button class="btn" id="refresh-dashboard">Refresh</button>
+    </div>
+
+    <!-- Logs -->
+    <div class="page" id="page-logs">
+        <div class="section-label">Daemon Log</div>
+        <div class="toolbar">
+            <button class="btn small" id="refresh-logs">Refresh</button>
+            <button class="btn small danger" id="clear-logs">Clear</button>
+            <label class="toggle-label">
+                <input type="checkbox" id="auto-refresh">
+                <span>Auto 5s</span>
+            </label>
+        </div>
+        <pre class="log-box" id="log-content">Loading...</pre>
+    </div>
+
+    <!-- Deny -->
+    <div class="page" id="page-deny">
+        <div class="section-label">Deny List</div>
+        <div class="toolbar">
+            <button class="btn small" id="refresh-deny">Refresh</button>
+            <button class="btn small danger" id="clear-deny">Clear All</button>
+        </div>
+        <div class="list-box" id="deny-content">Loading...</div>
+
+        <div class="section-label" style="margin-top:24px">Allow Cache</div>
+        <div class="toolbar">
+            <button class="btn small danger" id="clear-cache">Clear Cache</button>
+        </div>
+        <div class="list-box" id="cache-content" style="margin-top:8px">Loading...</div>
+    </div>
+
+    <!-- Config -->
+    <div class="page" id="page-config">
+        <div class="section-label">Settings</div>
+
+        <div class="config-card">
+            <div class="config-row">
+                <div class="config-info">
+                    <div class="config-name">Notification Timeout</div>
+                    <div class="config-desc">How long to wait for user response before denying</div>
+                </div>
+                <div class="config-control">
+                    <input type="range" id="timeout-slider" min="5" max="60" value="10">
+                    <span id="timeout-display">10s</span>
+                </div>
+            </div>
+            <button class="btn full" id="save-timeout">Save Timeout</button>
+        </div>
+
+        <div class="config-card">
+            <div class="config-row">
+                <div class="config-info">
+                    <div class="config-name">Daemon</div>
+                    <div class="config-desc">Restart the background daemon process</div>
+                </div>
+            </div>
+            <button class="btn full" id="restart-daemon">Restart Daemon</button>
+        </div>
+    </div>
+
+    <!-- Bottom Nav -->
+    <nav class="bottom-nav">
+        <div class="nav-item active" data-page="dashboard">
+            <svg viewBox="0 -960 960 960"><path d="M160-520v-280h280v280H160Zm0 360v-280h280v280H160Zm360-360v-280h280v280H520Zm0 360v-280h280v280H520Z"/></svg>
+            <span>Status</span>
+        </div>
+        <div class="nav-item" data-page="logs">
+            <svg viewBox="0 -960 960 960"><path d="M120-240v-80h480v80H120Zm0-200v-80h720v80H120Zm0-200v-80h720v80H120Z"/></svg>
+            <span>Logs</span>
+        </div>
+        <div class="nav-item" data-page="deny">
+            <svg viewBox="0 -960 960 960"><path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q56 0 105-17t91-48L225-676q-31 42-48 91t-17 105q0 134 93 227t227 93Zm255-124q31-42 48-91t17-105q0-134-93-227t-227-93q-56 0-105 17t-91 48l451 451Z"/></svg>
+            <span>Deny</span>
+        </div>
+        <div class="nav-item" data-page="config">
+            <svg viewBox="0 -960 960 960"><path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 22.5-15t24.5-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-1 13.5l103 78-110 190-119-50q-11 8-22.5 15T606-208L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 41q-22-23-48.5-38.5T533-694l-14-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 65q-5 14-7 29.5T260-480q0 16 2 31.5t7 29.5l-86 65 39 68 99-41q22 23 48.5 38.5T426-274l14 106Zm40-280q33 0 56.5-23.5T560-440q0-33-23.5-56.5T480-520q-33 0-56.5 23.5T400-440q0 33 23.5 56.5T480-360Zm0-80Z"/></svg>
+            <span>Config</span>
+        </div>
+    </nav>
+
     <script type="module" src="app.js"></script>
 </body>
 </html>
