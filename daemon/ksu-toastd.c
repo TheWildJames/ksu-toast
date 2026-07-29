@@ -64,8 +64,8 @@ struct ksu_get_manager_uid_cmd {
     __u32 uid;
 };
 
-/* ── Structs matching KSU UAPI ─────────────────────────── */
-struct __attribute__((packed)) root_profile {
+/* ── Structs matching KSU UAPI (must match kernel layout exactly) ── */
+struct root_profile {
     __s32 uid;
     __s32 gid;
     __u32 groups_count;
@@ -76,21 +76,33 @@ struct __attribute__((packed)) root_profile {
     __u64 flags;
 };
 
-struct __attribute__((packed)) non_root_profile {
+struct non_root_profile {
     __u8 umount_modules;
 };
 
-struct __attribute__((packed)) app_profile {
+/* Must match kernel's struct app_profile exactly, including union layout.
+ * The union adds padding after allow_su for alignment. */
+struct app_profile {
     __u32 version;
     char key[KSU_MAX_PACKAGE_NAME];
     __s32 curr_uid;
     __u8 allow_su;
-    __u8 use_default;
-    char template_name[KSU_MAX_PACKAGE_NAME];
-    struct root_profile profile;
+    /* 7 bytes implicit padding before union */
+    union {
+        struct {
+            __u8 use_default;
+            /* 3 bytes implicit padding before template_name */
+            char template_name[KSU_MAX_PACKAGE_NAME];
+            struct root_profile profile;
+        } rp_config;
+        struct {
+            __u8 use_default;
+            struct non_root_profile profile;
+        } nrp_config;
+    };
 };
 
-struct __attribute__((packed)) set_app_profile_cmd {
+struct set_app_profile_cmd {
     struct app_profile profile;
 };
 
@@ -281,7 +293,7 @@ static int grant_app_root(int target_uid, const char *pkg_name) {
     profile.version = KSU_APP_PROFILE_VER;
     profile.curr_uid = target_uid;
     profile.allow_su = 1;
-    profile.use_default = 1;
+    profile.rp_config.use_default = 1;
 
     /* Copy package name into key */
     if (pkg_name) {
