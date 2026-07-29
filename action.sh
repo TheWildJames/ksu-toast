@@ -64,6 +64,10 @@ SOCKET="$PERSISTENT_DIR/daemon.sock"
 BUSYBOX=/data/adb/ksu/bin/busybox
 
 if [ -S "$SOCKET" ]; then
+    # Ensure the companion APK foreground service is running.
+    # Launch the invisible activity — it starts the service and exits.
+    am start -n com.wildkernels.ksutoast/.LauncherActivity >/dev/null 2>&1 || true
+
     # Send a fake CHECK with UID 99999 (not in any list) to trigger
     # the full daemon → APK → notification flow, exactly as if a
     # real unknown app requested root. No actual root is granted.

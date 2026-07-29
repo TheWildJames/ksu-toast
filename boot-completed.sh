@@ -65,7 +65,9 @@ else
     ls -la "$MODDIR/system/bin/ksu-toastd" >> "$LOG" 2>&1 || true
 fi
 
-# 3. Start companion APK foreground service
+# 3. Start companion APK foreground service via launcher activity.
+# Launching an activity first satisfies Android 12+ foreground
+# service restrictions (background apps can't start FGS directly).
 if pm path com.wildkernels.ksutoast >/dev/null 2>&1; then
-    am start-foreground-service -n com.wildkernels.ksutoast/.MainService >/dev/null 2>&1 || true
+    am start -n com.wildkernels.ksutoast/.LauncherActivity >/dev/null 2>&1 || true
 fi

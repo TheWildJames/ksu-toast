@@ -130,26 +130,55 @@ static int file_append(const char *path, int uid) {
 }
 
 /* Resolve the KSU Next manager app's UID via the kernel module.
- * Uses KSU_IOCTL_GET_MANAGER_UID — the proper KSU API — instead of
- * parsing /data/system/packages.list.
+ * Uses KSU_IOCTL_GET_MANAGER_UID first, falls back to parsing
+ * /data/system/packages.list if the ioctl fails.
  *
  * Technique from backslashxx/ksu_toolkit. */
-static int resolve_manager_uid(void) {
-    /* Open the ksu driver fd via the backdoored SYS_reboot hook */
+static int resolve_manager_uid_via_ioctl(void) {
     int ksu_fd = -1;
     long ret = syscall(SYS_reboot, KSU_INSTALL_MAGIC1, KSU_INSTALL_MAGIC2, 0, &ksu_fd);
-    if (ret != 0 || ksu_fd < 0)
-        return -1;
+    if (ret != 0 || ksu_fd < 0) return -1;
 
-    /* Query the manager UID from the kernel */
     struct ksu_get_manager_uid_cmd cmd = {0};
     ret = ioctl(ksu_fd, KSU_IOCTL_GET_MANAGER_UID, &cmd);
     close(ksu_fd);
-
-    if (ret != 0 || cmd.uid == 0)
-        return -1;
-
+    if (ret != 0 || cmd.uid == 0) return -1;
     return (int)cmd.uid;
+}
+
+/* Fallback: parse /data/system/packages.list for known manager packages */
+static int resolve_manager_uid_fallback(void) {
+    FILE *f = fopen("/data/system/packages.list", "re");
+    if (!f) return -1;
+
+    const char *managers[] = {
+        "com.rifsxd.ksunext",
+        "me.weishu.kernelsu",
+        "com.rifsxd.kernelsunext",
+        NULL
+    };
+
+    char line[1024];
+    while (fgets(line, sizeof(line), f)) {
+        for (int i = 0; managers[i]; i++) {
+            size_t plen = strlen(managers[i]);
+            if (strncmp(line, managers[i], plen) == 0 && line[plen] == ' ') {
+                int uid;
+                if (sscanf(line + plen + 1, "%d", &uid) == 1) {
+                    fclose(f);
+                    return uid;
+                }
+            }
+        }
+    }
+    fclose(f);
+    return -1;
+}
+
+static int resolve_manager_uid(void) {
+    int uid = resolve_manager_uid_via_ioctl();
+    if (uid > 0) return uid;
+    return resolve_manager_uid_fallback();
 }
 
 /* Remove socket file and create a listening Unix socket */
