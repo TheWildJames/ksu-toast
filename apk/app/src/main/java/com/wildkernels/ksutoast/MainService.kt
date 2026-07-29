@@ -26,6 +26,7 @@ const val NOTIF_ID_BASE = 1000
 class MainService : Service() {
 
     private val CHANNEL_ID = "ksu_toast_requests"
+    private val SERVICE_CHANNEL_ID = "ksu_toast_service"
     private val NOTIF_ID_SERVICE = 1
 
     private var running = true
@@ -52,22 +53,34 @@ class MainService : Service() {
     }
 
     private fun createNotificationChannel() {
-        val channel = NotificationChannel(
+        // High importance channel for root request notifications
+        val reqChannel = NotificationChannel(
             CHANNEL_ID,
             getString(R.string.channel_name),
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
             description = getString(R.string.channel_desc)
         }
+        // Low importance channel for persistent service notification (no sound/popup)
+        val svcChannel = NotificationChannel(
+            SERVICE_CHANNEL_ID,
+            "KSU Toast Service",
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = "Persistent service indicator"
+            setShowBadge(false)
+        }
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        nm.createNotificationChannel(channel)
+        nm.createNotificationChannel(reqChannel)
+        nm.createNotificationChannel(svcChannel)
     }
 
     private fun buildServiceNotification(): Notification {
-        return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle(getString(R.string.service_notification))
+        return Notification.Builder(this, SERVICE_CHANNEL_ID)
+            .setContentTitle(getString(R.string.service_notification_low))
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setOngoing(true)
+            .setSilent(true)
             .build()
     }
 

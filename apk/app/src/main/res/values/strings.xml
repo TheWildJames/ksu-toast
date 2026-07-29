@@ -4,6 +4,7 @@
     <string name="channel_name">Root Requests</string>
     <string name="channel_desc">Notifications for apps requesting root access</string>
     <string name="service_notification">KSU Toast is running</string>
+    <string name="service_notification_low">KSU Toast</string>
     <string name="grant">Grant</string>
     <string name="deny">Deny</string>
     <string name="ignore">Ignore</string>
