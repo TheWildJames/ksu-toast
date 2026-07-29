@@ -33,7 +33,7 @@
 /* ── Configuration ──────────────────────────────────────── */
 #define DAEMON_SOCKET   "/data/adb/ksu-toast/daemon.sock"
 /* Abstract socket — avoids SELinux file context issues with /data/adb/ */
-#define APK_SOCKET      "@ksu-toast-apk"
+#define APK_SOCKET      "/data/adb/ksu-toast/apk.sock"
 #define DENY_LIST       "/data/adb/ksu-toast/deny.list"
 #define ALLOW_CACHE     "/data/adb/ksu-toast/allow.cache"
 #define PID_FILE        "/data/adb/ksu-toast/daemon.pid"
@@ -529,10 +529,6 @@ int main(int argc, char *argv[]) {
 
     /* Create APK communication socket */
     apk_listen_fd = create_socket(apk_path);
-    if (apk_listen_fd < 0) {
-        /* Fallback: try filesystem socket if abstract fails */
-        apk_listen_fd = create_socket("/data/adb/ksu-toast/apk.sock");
-    }
     if (apk_listen_fd < 0) {
         fprintf(stderr, "[ksu-toast] WARNING: Failed to create APK socket: %s\n", apk_path);
         fprintf(stderr, "[ksu-toast] Companion APK notifications will not work.\n");

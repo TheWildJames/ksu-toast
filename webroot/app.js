@@ -157,7 +157,7 @@ $('restart-daemon').addEventListener('click', async () => {
     await sh(`rm -f "${SOCK}" "${PIDF}"`);
     await new Promise(r => setTimeout(r, 500));
     await sh(`/system/bin/ksu-toastd \\
-        --socket "${SOCK}" --apk-socket "@ksu-toast-apk" \\
+        --socket "${SOCK}" --apk-socket "/data/adb/ksu-toast/apk.sock" \\
         --deny-list "${DENY}" --cache "${CACHE}" \\
         --config "${DIR}/config" > "${LOG}" 2>&1 &
     `);

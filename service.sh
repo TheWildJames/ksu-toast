@@ -6,7 +6,7 @@
 MODDIR=/data/adb/modules/ksu_toast
 PERSISTENT_DIR=/data/adb/ksu-toast
 SOCKET="$PERSISTENT_DIR/daemon.sock"
-APK_SOCKET="@ksu-toast-apk"
+APK_SOCKET="/data/adb/ksu-toast/apk.sock"
 DENY_LIST="$PERSISTENT_DIR/deny.list"
 CACHE="$PERSISTENT_DIR/allow.cache"
 # Daemon at system overlay path — guaranteed accessible by KSU mount

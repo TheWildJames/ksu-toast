@@ -104,22 +104,22 @@ class MainService : Service() {
                 attemptCount++
                 var connected = false
 
-                // Try abstract socket first (no SELinux)
+                // Try filesystem socket first (reliable on all Android versions)
                 try {
                     val s = LocalSocket()
-                    s.connect(LocalSocketAddress(socketName, LocalSocketAddress.Namespace.ABSTRACT))
-                    writeStatus("connected_abstract_$attemptCount")
+                    s.connect(LocalSocketAddress(fileSocketPath, LocalSocketAddress.Namespace.FILESYSTEM))
+                    writeStatus("connected_filesystem_$attemptCount")
                     connected = true
                     handleConnection(s)
                 } catch (_: Exception) {
-                    // Fall back to filesystem socket
+                    // Fall back to abstract socket
                 }
 
                 if (!connected) {
                     try {
                         val s = LocalSocket()
-                        s.connect(LocalSocketAddress(fileSocketPath, LocalSocketAddress.Namespace.FILESYSTEM))
-                        writeStatus("connected_filesystem_$attemptCount")
+                        s.connect(LocalSocketAddress(socketName, LocalSocketAddress.Namespace.ABSTRACT))
+                        writeStatus("connected_abstract_$attemptCount")
                         connected = true
                         handleConnection(s)
                     } catch (_: Exception) {
