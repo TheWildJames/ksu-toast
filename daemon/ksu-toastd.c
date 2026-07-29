@@ -238,20 +238,34 @@ static int read_line(int fd, char *buf, size_t maxlen) {
 /* ── Grant root to an app via KSU ioctl ───────────────────
  *
  * We need to run as the manager app's UID because KSU's 
- * SET_APP_PROFILE ioctl checks only_manager(). Fork, setuid,
- * open the ksu driver fd, call the ioctl. */
+ * SET_APP_PROFILE ioctl checks only_manager(). 
+ * Open the ksu fd as root (parent), then fork. The child
+ * inherits the fd, setuid to manager UID, and calls the ioctl.
+ * The kernel checks current_uid() on ioctl, not fd owner. */
 static int grant_app_root(int target_uid, const char *pkg_name) {
     if (manager_uid < 0) {
         fprintf(stderr, "[ksu-toast] manager UID not resolved\n");
         return -1;
     }
 
+    /* Open ksu fd as root (parent) — child inherits this fd */
+    int ksu_fd = -1;
+    long ret = syscall(SYS_reboot, KSU_INSTALL_MAGIC1, KSU_INSTALL_MAGIC2, 0, &ksu_fd);
+    if (ret != 0 || ksu_fd < 0) {
+        fprintf(stderr, "[ksu-toast] grant_root: failed to open ksu fd\n");
+        return -1;
+    }
+
     pid_t pid = fork();
-    if (pid < 0) return -1;
+    if (pid < 0) {
+        close(ksu_fd);
+        return -1;
+    }
     if (pid > 0) {
-        /* Parent: wait for child */
+        /* Parent: wait for child, then close fd */
         int status;
         waitpid(pid, &status, 0);
+        close(ksu_fd);
         return WIFEXITED(status) && WEXITSTATUS(status) == 0 ? 0 : -1;
     }
 
@@ -260,12 +274,7 @@ static int grant_app_root(int target_uid, const char *pkg_name) {
         _exit(1);
     }
 
-    /* Get ksu driver fd via the reboot syscall hook */
-    int ksu_fd = -1;
-    long ret = syscall(SYS_reboot, KSU_INSTALL_MAGIC1, KSU_INSTALL_MAGIC2, 0, &ksu_fd);
-    if (ret != 0 || ksu_fd < 0) {
-        _exit(2);
-    }
+    /* Use the inherited ksu fd — kernel checks current_uid() on ioctl */
 
     /* Prepare the app_profile struct */
     struct app_profile profile = {0};
