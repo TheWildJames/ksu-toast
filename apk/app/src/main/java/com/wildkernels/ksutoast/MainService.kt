@@ -80,7 +80,6 @@ class MainService : Service() {
             .setContentTitle(getString(R.string.service_notification_low))
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setOngoing(true)
-            .setSilent(true)
             .build()
     }
 
