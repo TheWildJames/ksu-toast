@@ -37,6 +37,11 @@ async function fileExists(path) {
     return (r.stdout || r || '').trim() === '1';
 }
 
+async function socketExists(path) {
+    const r = await exec(`test -S "${path}" && echo 1 || echo 0`);
+    return (r.stdout || r || '').trim() === '1';
+}
+
 async function fileSize(path) {
     const r = await exec(`wc -c < "${path}" 2>/dev/null || echo 0`);
     return parseInt((r.stdout || r || '').trim()) || 0;
@@ -60,7 +65,7 @@ async function refreshDashboard() {
     }
     setText('daemon-status', daemonRunning ? 'Running' : 'Stopped', daemonRunning);
 
-    const sockExists = await fileExists(DAEMON_SOCK);
+    const sockExists = await socketExists(DAEMON_SOCK);
     setText('socket-status', sockExists ? 'Ready' : 'Missing', sockExists);
 
     const denyCount = await lineCount(DENY_LIST);
@@ -148,7 +153,7 @@ document.getElementById('refresh-dashboard').addEventListener('click', refreshDa
 
 document.getElementById('refresh-logs').addEventListener('click', refreshLogs);
 document.getElementById('clear-logs').addEventListener('click', async () => {
-    await exec(`echo "" > "${DAEMON_LOG}" 2>/dev/null`);
+    await exec(`truncate -s 0 "${DAEMON_LOG}" 2>/dev/null || : > "${DAEMON_LOG}"`);
     toast('Logs cleared');
     refreshLogs();
 });
