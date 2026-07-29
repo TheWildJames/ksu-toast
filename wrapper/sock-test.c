@@ -9,6 +9,7 @@
 
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/time.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
@@ -40,6 +41,10 @@ int main(int argc, char *argv[]) {
         close(fd);
         return 1;
     }
+
+    /* Set 12-second receive timeout (daemon waits 10s for APK) */
+    struct timeval rcv_tv = { .tv_sec = 12, .tv_usec = 0 };
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &rcv_tv, sizeof(rcv_tv));
 
     /* Send message + newline */
     write(fd, msg, msg_len);

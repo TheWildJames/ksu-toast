@@ -259,6 +259,18 @@ static int ask_apk(int uid, const char *app_name) {
     /* Accept a connection from the APK (or fail if no APK connected) */
     struct sockaddr_un client_addr;
     socklen_t client_len = sizeof(client_addr);
+
+    /* Wait up to REQ_TIMEOUT_SEC for APK to connect */
+    struct timeval accept_tv = { .tv_sec = REQ_TIMEOUT_SEC, .tv_usec = 0 };
+    fd_set accept_fds;
+    FD_ZERO(&accept_fds);
+    FD_SET(apk_listen_fd, &accept_fds);
+    int sel_ret = select(apk_listen_fd + 1, &accept_fds, NULL, NULL, &accept_tv);
+    if (sel_ret <= 0) {
+        fprintf(stderr, "[ksu-toast] APK connection timed out\n");
+        return -1;
+    }
+
     int apk_fd = accept(apk_listen_fd, (struct sockaddr *)&client_addr, &client_len);
     if (apk_fd < 0) return -1;
 
