@@ -94,43 +94,26 @@ class MainService : Service() {
     private fun connectToDaemon() {
         // Abstract socket — matches daemon's @ksu-toast-apk
         // No SELinux file context issues (no filesystem file created)
-        val socketName = "ksu-toast-apk"
-        val fileSocketPath = "/data/adb/ksu-toast/apk.sock"
+        val socketPath = "/data/adb/ksu-toast/apk.sock"
         var attemptCount = 0
 
         // Retry loop — daemon might not be ready yet at boot
         while (running) {
             try {
                 attemptCount++
-                var connected = false
+                val socket = LocalSocket()
+                socket.connect(LocalSocketAddress(socketPath, LocalSocketAddress.Namespace.FILESYSTEM))
+                writeStatus("connected_$attemptCount")
 
-                // Try filesystem socket first (reliable on all Android versions)
-                try {
-                    val s = LocalSocket()
-                    s.connect(LocalSocketAddress(fileSocketPath, LocalSocketAddress.Namespace.FILESYSTEM))
-                    writeStatus("connected_filesystem_$attemptCount")
-                    connected = true
-                    handleConnection(s)
-                } catch (_: Exception) {
-                    // Fall back to abstract socket
+                val reader = BufferedReader(InputStreamReader(socket.inputStream))
+                val writer = PrintWriter(socket.outputStream, true)
+
+                while (running) {
+                    val line = reader.readLine() ?: break
+                    handleRequest(line, writer)
                 }
 
-                if (!connected) {
-                    try {
-                        val s = LocalSocket()
-                        s.connect(LocalSocketAddress(socketName, LocalSocketAddress.Namespace.ABSTRACT))
-                        writeStatus("connected_abstract_$attemptCount")
-                        connected = true
-                        handleConnection(s)
-                    } catch (_: Exception) {
-                        // Both methods failed
-                    }
-                }
-
-                if (!connected) {
-                    writeStatus("both_failed_$attemptCount")
-                    try { Thread.sleep(3000) } catch (_: InterruptedException) { break }
-                }
+                socket.close()
             } catch (e: Exception) {
                 if (!running) break
                 val msg = e.message ?: e.javaClass.simpleName
