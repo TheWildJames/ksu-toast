@@ -1,148 +1,109 @@
 #!/system/bin/sh
 # KSU Toast - Action button script
-# Runs when you tap the "Action" button in KSU Next Manager.
-# Shows status + optionally triggers a test root request.
+# Shows everything in one place: status, logs, test results.
+# No need to hunt for separate files.
 
 MODDIR=${0%/*}
 PERSISTENT_DIR=/data/adb/ksu-toast
+SOCKET="$PERSISTENT_DIR/daemon.sock"
+DAEMON="$PERSISTENT_DIR/daemon.log"
+APK_STATUS="/data/local/tmp/ksu-toast-apk-status.txt"
 
 echo "╔══════════════════════════════════╗"
 echo "║        KSU Toast                 ║"
 echo "╚══════════════════════════════════╝"
-echo ""
 
-# ── Status checks ────────────────────────────────────────
+# ── 1. Status ─────────────────────────────────────────────
+echo ""
+echo "═══ Status ═══"
+
 DAEMON_PID="$PERSISTENT_DIR/daemon.pid"
 if [ -f "$DAEMON_PID" ]; then
     PID=$(cat "$DAEMON_PID" 2>/dev/null)
-    if kill -0 "$PID" 2>/dev/null; then
-        echo "✓ Daemon running (pid: $PID)"
-    else
-        echo "✗ Daemon pid file stale"
-    fi
+    kill -0 "$PID" 2>/dev/null && echo "DAEMON: running (pid $PID)" || echo "DAEMON: pid file stale"
 else
-    echo "✗ Daemon not started"
+    echo "DAEMON: not started"
 fi
 
-if [ -S "$PERSISTENT_DIR/daemon.sock" ]; then
-    echo "✓ Daemon socket ready"
-else
-    echo "✗ Daemon socket missing"
-fi
+[ -S "$SOCKET" ] && echo "SOCKET: ready" || echo "SOCKET: missing"
 
-# Show last few lines of daemon log if something's wrong
-if [ ! -S "$PERSISTENT_DIR/daemon.sock" ] && [ -f "$PERSISTENT_DIR/daemon.log" ]; then
-    echo ""
-    echo "═══ Daemon log (last 5 lines) ═══"
-    tail -5 "$PERSISTENT_DIR/daemon.log" 2>/dev/null
-    echo ""
-fi
-
-DENY="$PERSISTENT_DIR/deny.list"
-[ -f "$DENY" ] && echo "✓ Deny list: $(wc -l < "$DENY") entries" || echo "✗ Deny list missing"
-
-CACHE="$PERSISTENT_DIR/allow.cache"
-[ -f "$CACHE" ] && echo "✓ Allow cache: $(wc -l < "$CACHE") entries" || echo "✗ Allow cache missing"
+[ -f "$PERSISTENT_DIR/deny.list" ] && echo "DENY LIST: $(wc -l < "$PERSISTENT_DIR/deny.list") entries"
+[ -f "$PERSISTENT_DIR/allow.cache" ] && echo "ALLOW CACHE: $(wc -l < "$PERSISTENT_DIR/allow.cache") entries"
 
 if [ -f /system/bin/su ] && file /system/bin/su 2>/dev/null | grep -q ELF; then
-    echo "✓ su wrapper active (binary)"
+    echo "SU WRAPPER: active (binary)"
 else
-    echo "? su is symlink — wrapper may not be active"
+    echo "SU WRAPPER: symlink only"
 fi
 
-if pm path com.wildkernels.ksutoast >/dev/null 2>&1; then
-    echo "✓ Companion APK installed"
+pm path com.wildkernels.ksutoast >/dev/null 2>&1 && echo "APK: installed" || echo "APK: not installed"
+
+# ── 2. Daemon log (always shown) ──────────────────────────
+echo ""
+echo "═══ Daemon log ═══"
+if [ -f "$DAEMON" ]; then
+    cat "$DAEMON" 2>/dev/null || echo "(empty)"
 else
-    echo "✗ Companion APK not installed"
+    echo "(no log file)"
 fi
 
+# ── 3. APK connection status ──────────────────────────────
 echo ""
-echo "═══ Test: trigger root request ═══"
-echo ""
+echo "═══ APK connection ═══"
+if [ -f "$APK_STATUS" ]; then
+    cat "$APK_STATUS" 2>/dev/null
+else
+    echo "(no status file — APK may not have tried to connect yet)"
+    echo "(retries every 3 seconds after service starts)"
+fi
 
-SOCKET="$PERSISTENT_DIR/daemon.sock"
-BUSYBOX=/data/adb/ksu/bin/busybox
+# ── 4. Test ───────────────────────────────────────────────
+echo ""
+echo "═══ Test: simulate root request ═══"
 
 if [ -S "$SOCKET" ]; then
-    # Ensure the companion APK foreground service is running.
-    # Launch the invisible activity — it starts the service and exits.
+    # Start APK service
     am start -n com.wildkernels.ksutoast/.LauncherActivity -f 0x10000000 >/dev/null 2>&1 || \
     am start-foreground-service -n com.wildkernels.ksutoast/.MainService >/dev/null 2>&1 || true
 
-    # Send a fake CHECK with UID 99999 (not in any list) to trigger
-    # the full daemon → APK → notification flow, exactly as if a
-    # real unknown app requested root. No actual root is granted.
-    echo "Sending test request to daemon (UID 99999, app TestApp)..."
+    echo "Sending CHECK 99999 TestApp to daemon..."
     echo ""
 
-    # Try multiple methods to talk to the Unix socket
     REQ="CHECK 99999 TestApp"
-    TEST_RESULT=""
+    RESULT=""
 
-    # Method 1: built-in sock-test binary (most reliable, no deps)
-    if [ -z "$TEST_RESULT" ] && [ -x /system/bin/sock-test ]; then
-        TEST_RESULT=$(/system/bin/sock-test "$SOCKET" "$REQ" 2>/dev/null) || true
-    fi
-
-    # Method 2: busybox nc -U (Unix socket mode)
-    if [ -z "$TEST_RESULT" ]; then
-        TEST_RESULT=$(echo "$REQ" | $BUSYBOX nc -U -w 3 "$SOCKET" 2>/dev/null </dev/null) || true
-    fi
-
-    # Method 2: socat
-    if [ -z "$TEST_RESULT" ] && command -v socat >/dev/null 2>&1; then
-        TEST_RESULT=$(echo "$REQ" | socat UNIX-CONNECT:"$SOCKET" - 2>/dev/null) || true
-    fi
-
-    # Method 3: python3
-    if [ -z "$TEST_RESULT" ] && command -v python3 >/dev/null 2>&1; then
-        TEST_RESULT=$(python3 -c "
+    [ -z "$RESULT" ] && [ -x /system/bin/sock-test ] && \
+        RESULT=$(/system/bin/sock-test "$SOCKET" "$REQ" 2>/dev/null) || true
+    [ -z "$RESULT" ] && \
+        RESULT=$(echo "$REQ" | /data/adb/ksu/bin/busybox nc -U -w 3 "$SOCKET" 2>/dev/null </dev/null) || true
+    [ -z "$RESULT" ] && command -v socat >/dev/null 2>&1 && \
+        RESULT=$(echo "$REQ" | socat UNIX-CONNECT:"$SOCKET" - 2>/dev/null) || true
+    [ -z "$RESULT" ] && command -v python3 >/dev/null 2>&1 && \
+        RESULT=$(python3 -c "
 import socket
-s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
 s.settimeout(5)
 s.connect('$SOCKET')
 s.send(b'$REQ\n')
-r = s.recv(256)
+r=s.recv(256)
 s.close()
 print(r.decode().strip())
 " 2>/dev/null) || true
-    fi
-    if echo "$TEST_RESULT" | grep -q "ALLOWED"; then
-        echo "✓ Daemon responded: ROOT GRANTED (would be allowed)"
-    elif echo "$TEST_RESULT" | grep -q "DENIED"; then
-        echo "⚠ Daemon responded: DENIED (check APK notification)"
-        echo "  (A notification should appear within 10 seconds)"
-    elif [ -z "$TEST_RESULT" ]; then
-        echo "⚠ Could not send test — no Unix socket tool found"
-        echo "  Install socat or python3, or use a newer BusyBox"
-    else
-        echo "⚠ Daemon response: $TEST_RESULT"
-        echo "  (Notification may already be showing)"
-    fi
+
+    case "$RESULT" in
+        ALLOWED) echo "→ DAEMON SAYS: ALLOWED (would grant root)" ;;
+        DENIED)  echo "→ DAEMON SAYS: DENIED (APK not connected or timed out)" ;;
+        *)       [ -n "$RESULT" ] && echo "→ DAEMON SAYS: $RESULT"
+                 [ -z "$RESULT" ] && echo "→ Could not reach daemon (no socket tool)"
+                 ;;
+    esac
 else
-    # Fallback: direct su test
-    echo "Daemon socket not available — testing su-wrapper directly."
-    echo ""
-    TEST_OUTPUT=$(su -c id 2>&1 </dev/null) && {
-        echo "✓ ROOT ACCESS GRANTED via ksud (direct path)"
-        echo "  uid=$(echo "$TEST_OUTPUT" | grep -o 'uid=[^ ]*' || echo "unknown")"
-    } || {
-        echo "✗ Root request denied"
-    }
-fi
-
-# Show APK connection status (written by companion app to debug socket connection)
-APK_STATUS_FILE="/data/local/tmp/ksu-toast-apk-status.txt"
-if [ -f "$APK_STATUS_FILE" ]; then
-    echo ""
-    echo "═══ APK connection log (last 3 lines) ═══"
-    tail -3 "$APK_STATUS_FILE" 2>/dev/null
+    echo "Daemon socket missing — testing su-wrapper directly."
+    TEST_OUTPUT=$(su -c id 2>&1 </dev/null) && \
+        echo "→ su works (uid=$(echo "$TEST_OUTPUT" | grep -o 'uid=[^ ]*' || echo "root"))" || \
+        echo "→ su failed"
 fi
 
 echo ""
-echo "═══ Help ═══"
-echo ""
-echo "- Ensure daemon is running: check status above"
-echo "- Grant notification permission to KSU Toast app"
-echo "- Check /data/adb/ksu-toast/ for logs"
-echo ""
+echo "═══ End ═══"
+echo "Full logs: $DAEMON, $APK_STATUS"
