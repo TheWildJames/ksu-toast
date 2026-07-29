@@ -328,16 +328,19 @@ static int ask_apk(int uid, const char *app_name) {
     if (sel_ret <= 0) {
         fprintf(stderr, "[ksu-toast] APK connection timed out\n");
         /* Fallback: post Android notification directly via cmd notification.
-         * This works without the companion APK. User taps notification,
-         * opens WebUI to Grant/Deny. */
+         * This works without the companion APK. On Android 14+, the
+         * APK cannot connect to our socket due to SELinux restrictions,
+         * so this is the primary notification path. */
         char notif_cmd[1024];
         snprintf(notif_cmd, sizeof(notif_cmd),
             "cmd notification post -t \"Root request\" "
-            "\"%s wants root access\" "
-            "--style bigtext --content-text \"Open KSU Toast WebUI to respond\" "
-            "ksu_toast_req_%d >/dev/null 2>&1",
-            app_name ? app_name : "App", uid);
-        system(notif_cmd);
+            "--importance 4 "
+            "\"ksu_toast_req_%d\" "
+            "\"%s wants root\" "
+            ">/dev/null 2>&1",
+            uid, app_name ? app_name : "App");
+        int nret = system(notif_cmd);
+        fprintf(stderr, "[ksu-toast] cmd notification post: ret=%d\n", nret);
         return -1;
     }
 
