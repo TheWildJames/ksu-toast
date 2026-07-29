@@ -323,10 +323,10 @@ static int grant_app_root(int target_uid, const char *pkg_name) {
     fprintf(stderr, "[ksu-toast] grant_root: profile version=%d uid=%d allow=%d use_def=%d key=%.20s\n",
             profile.version, profile.curr_uid, profile.allow_su,
             profile.rp_config.use_default, profile.key);
-    /* Hex dump first 80 bytes for struct comparison */
+    /* Hex dump first 280 bytes for struct comparison */
     fprintf(stderr, "[ksu-toast] grant_root: hex=");
     unsigned char *pb = (unsigned char *)&profile;
-    for (int i = 0; i < 80; i++) fprintf(stderr, "%02x", pb[i]);
+    for (int i = 0; i < 280; i++) fprintf(stderr, "%02x", pb[i]);
     fprintf(stderr, "\n");
     close(ksu_fd);
 
