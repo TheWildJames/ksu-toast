@@ -76,7 +76,9 @@ jobs:
         run: |
           cd apk
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease --no-daemon \
+            -PversionCode=${{ steps.version.outputs.num }} \
+            -PversionName=v${{ steps.version.outputs.num }}
           cd ..
           mkdir -p build/apk
           # Copy signed release APK (debug-signed via build.gradle.kts)

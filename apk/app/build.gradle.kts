@@ -11,8 +11,9 @@ android {
         applicationId = "com.wildkernels.ksutoast"
         minSdk = 28
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        // versionCode passed from CI (-PversionCode=N), falls back to 1
+        versionCode = project.findProperty("versionCode")?.toString()?.toIntOrNull() ?: 1
+        versionName = project.findProperty("versionName")?.toString() ?: "1.0"
     }
 
     signingConfigs {
