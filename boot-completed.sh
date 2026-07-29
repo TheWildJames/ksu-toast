@@ -40,7 +40,8 @@ if [ -f "$DAEMON_PID" ]; then
     fi
 fi
 
-rm -f "$SOCKET" "$APK_SOCKET" "$DAEMON_PID"
+rm -f "$SOCKET" "$DAEMON_PID"
+# APK socket is abstract (\0ksu-toast-apk) — no filesystem file to remove
 
 if [ -x "$DAEMON" ]; then
     ASH_STANDALONE=1 "$DAEMON" \

@@ -32,7 +32,8 @@
 
 /* ── Configuration ──────────────────────────────────────── */
 #define DAEMON_SOCKET   "/data/adb/ksu-toast/daemon.sock"
-#define APK_SOCKET      "/data/adb/ksu-toast/apk.sock"
+/* Abstract socket — avoids SELinux file context issues with /data/adb/ */
+#define APK_SOCKET      "@ksu-toast-apk"
 #define DENY_LIST       "/data/adb/ksu-toast/deny.list"
 #define ALLOW_CACHE     "/data/adb/ksu-toast/allow.cache"
 #define PID_FILE        "/data/adb/ksu-toast/daemon.pid"
@@ -188,19 +189,29 @@ static int create_socket(const char *path) {
     if (fd < 0) return -1;
 
     struct sockaddr_un addr = { .sun_family = AF_UNIX };
-    strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+
+    /* Abstract socket if path starts with '@' (no filesystem file, no SELinux) */
+    if (path[0] == '@') {
+        addr.sun_path[0] = '\0';
+        strncpy(addr.sun_path + 1, path + 1, sizeof(addr.sun_path) - 2);
+    } else {
+        unlink(path);
+        strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+    }
 
     if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         close(fd);
         return -1;
     }
 
-    /* Make sure the APK can connect — world-readable socket */
-    chmod(path, 0777);
+    /* Filesystem sockets need world-rw for APK; abstract sockets don't */
+    if (path[0] != '@') {
+        chmod(path, 0777);
+    }
 
     if (listen(fd, SOCKET_BACKLOG) < 0) {
         close(fd);
-        unlink(path);
+        if (path[0] != '@') unlink(path);
         return -1;
     }
     return fd;
@@ -509,7 +520,8 @@ int main(int argc, char *argv[]) {
     }
     if (apk_listen_fd >= 0) {
         close(apk_listen_fd);
-        unlink(apk_path);
+        /* Abstract socket — no filesystem file to unlink */
+        if (apk_path[0] != '@') unlink(apk_path);
     }
     unlink(PID_FILE);
 

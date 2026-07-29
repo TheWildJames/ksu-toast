@@ -20,7 +20,8 @@ if [ -f "$DAEMON_PID" ]; then
     [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null && exit 0
 fi
 
-rm -f "$SOCKET" "$APK_SOCKET"
+rm -f "$SOCKET"
+# APK socket is abstract (\0ksu-toast-apk) — no filesystem file
 
 if [ -x "$DAEMON" ]; then
     mkdir -p "$PERSISTENT_DIR"

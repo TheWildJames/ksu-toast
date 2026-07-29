@@ -80,13 +80,15 @@ class MainService : Service() {
      * NotificationActionReceiver sends the response back.
      */
     private fun connectToDaemon() {
-        val socketPath = "/data/adb/ksu-toast/apk.sock"
+        // Abstract socket — matches daemon's @ksu-toast-apk
+        // No SELinux file context issues (no filesystem file created)
+        val socketName = "ksu-toast-apk"
 
         // Retry loop — daemon might not be ready yet at boot
         while (running) {
             try {
                 val socket = LocalSocket()
-                socket.connect(LocalSocketAddress(socketPath, LocalSocketAddress.Namespace.FILESYSTEM))
+                socket.connect(LocalSocketAddress(socketName, LocalSocketAddress.Namespace.ABSTRACT))
 
                 val reader = BufferedReader(InputStreamReader(socket.inputStream))
                 val writer = PrintWriter(socket.outputStream, true)
