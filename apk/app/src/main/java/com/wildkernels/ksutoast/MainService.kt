@@ -90,33 +90,57 @@ class MainService : Service() {
         while (running) {
             try {
                 attemptCount++
-                val socket = LocalSocket()
+                var connected = false
 
-                // Try abstract socket first (no SELinux), fall back to filesystem
+                // Try abstract socket first (no SELinux)
                 try {
-                    socket.connect(LocalSocketAddress(socketName, LocalSocketAddress.Namespace.ABSTRACT))
+                    val s = LocalSocket()
+                    s.connect(LocalSocketAddress(socketName, LocalSocketAddress.Namespace.ABSTRACT))
                     writeStatus("connected_abstract_$attemptCount")
+                    connected = true
+                    handleConnection(s)
                 } catch (_: Exception) {
-                    socket.connect(LocalSocketAddress(fileSocketPath, LocalSocketAddress.Namespace.FILESYSTEM))
-                    writeStatus("connected_filesystem_$attemptCount")
+                    // Fall back to filesystem socket
                 }
 
-                val reader = BufferedReader(InputStreamReader(socket.inputStream))
-                val writer = PrintWriter(socket.outputStream, true)
-
-                while (running) {
-                    val line = reader.readLine() ?: break
-                    handleRequest(line, writer)
+                if (!connected) {
+                    try {
+                        val s = LocalSocket()
+                        s.connect(LocalSocketAddress(fileSocketPath, LocalSocketAddress.Namespace.FILESYSTEM))
+                        writeStatus("connected_filesystem_$attemptCount")
+                        connected = true
+                        handleConnection(s)
+                    } catch (_: Exception) {
+                        // Both methods failed
+                    }
                 }
 
-                socket.close()
+                if (!connected) {
+                    writeStatus("both_failed_$attemptCount")
+                    try { Thread.sleep(3000) } catch (_: InterruptedException) { break }
+                }
             } catch (e: Exception) {
                 if (!running) break
                 val msg = e.message ?: e.javaClass.simpleName
                 writeStatus("retry_${attemptCount}_${msg.take(40)}")
-                // Daemon socket not ready yet — retry in 3 seconds
                 try { Thread.sleep(3000) } catch (_: InterruptedException) { break }
             }
+        }
+    }
+
+    /** Handle an active connection — read requests from daemon */
+    private fun handleConnection(socket: LocalSocket) {
+        try {
+            val reader = BufferedReader(InputStreamReader(socket.inputStream))
+            val writer = PrintWriter(socket.outputStream, true)
+
+            while (running) {
+                val line = reader.readLine() ?: break
+                handleRequest(line, writer)
+            }
+        } catch (_: Exception) {
+        } finally {
+            try { socket.close() } catch (_: Exception) {}
         }
     }
 
