@@ -303,6 +303,9 @@ static int grant_app_root(int target_uid, const char *pkg_name) {
     profile.curr_uid = target_uid;
     profile.allow_su = 1;
     profile.rp_config.use_default = 1;
+    /* profile_valid() checks selinux_domain even when use_default=1.
+     * Must set a non-empty domain to avoid EINVAL. */
+    strcpy(profile.rp_config.profile.selinux_domain, "u:r:ksu:s0");
 
     /* Copy package name into key */
     if (pkg_name) {
