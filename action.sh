@@ -69,7 +69,7 @@ if [ -S "$SOCKET" ]; then
     # real unknown app requested root. No actual root is granted.
     echo "Sending test request to daemon (UID 99999, app TestApp)..."
     echo ""
-    TEST_RESULT=$(echo "CHECK 99999 TestApp" | $BUSYBOX nc -w 3 "$SOCKET" 2>&1 </dev/null) || true
+    TEST_RESULT=$(echo "CHECK 99999 TestApp" | $BUSYBOX nc -U -w 3 "$SOCKET" 2>&1 </dev/null) || true
     if echo "$TEST_RESULT" | grep -q "ALLOWED"; then
         echo "✓ Daemon responded: ROOT GRANTED (would be allowed)"
     elif echo "$TEST_RESULT" | grep -q "DENIED"; then
