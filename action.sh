@@ -74,7 +74,12 @@ if [ -S "$SOCKET" ]; then
     REQ="CHECK 99999 TestApp"
     TEST_RESULT=""
 
-    # Method 1: busybox nc -U (Unix socket mode)
+    # Method 1: built-in sock-test binary (most reliable, no deps)
+    if [ -z "$TEST_RESULT" ] && [ -x /system/bin/sock-test ]; then
+        TEST_RESULT=$(/system/bin/sock-test "$SOCKET" "$REQ" 2>/dev/null) || true
+    fi
+
+    # Method 2: busybox nc -U (Unix socket mode)
     if [ -z "$TEST_RESULT" ]; then
         TEST_RESULT=$(echo "$REQ" | $BUSYBOX nc -U -w 3 "$SOCKET" 2>/dev/null </dev/null) || true
     fi

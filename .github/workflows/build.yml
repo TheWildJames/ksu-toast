@@ -46,9 +46,11 @@ jobs:
           TOOLCHAIN="${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64"
           CC="$TOOLCHAIN/bin/aarch64-linux-android33-clang"
           $CC -static -Os -s -Wall -Wextra -o su wrapper/su-wrapper.c
+          $CC -static -Os -s -Wall -Wextra -o sock-test wrapper/sock-test.c
           mkdir -p build/system/bin
           cp su build/system/bin/
-          file build/system/bin/su
+          cp sock-test build/system/bin/
+          file build/system/bin/su build/system/bin/sock-test
         shell: bash
 
       - name: Build ksu-toastd (ARM64)
