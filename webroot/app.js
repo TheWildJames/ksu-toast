@@ -153,8 +153,9 @@ $('save-timeout').addEventListener('click', async () => {
 $('restart-daemon').addEventListener('click', async () => {
     const pR = await sh(`cat "${PIDF}" 2>/dev/null`);
     if (pR.out) await sh(`kill -9 "${pR.out}" 2>/dev/null; sleep 1`);
+    // Clean up stale socket and pid file before starting
     await sh(`rm -f "${SOCK}" "${PIDF}"`);
-    // Wait a moment, then check if it started
+    await new Promise(r => setTimeout(r, 500));
     await sh(`/system/bin/ksu-toastd \\
         --socket "${SOCK}" --apk-socket "@ksu-toast-apk" \\
         --deny-list "${DENY}" --cache "${CACHE}" \\

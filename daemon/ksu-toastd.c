@@ -44,7 +44,7 @@
 #ifndef LINE_MAX
 #define LINE_MAX 4096
 #endif
-#define REQ_TIMEOUT_SEC 10
+#define REQ_TIMEOUT_SEC_DEFAULT 10
 #define PKG_NAME_MAX    256
 
 /* ── KSU UAPI constants (from KernelSU Next) ───────────── */
@@ -111,6 +111,7 @@ static int daemon_sock_fd = -1;
 static int apk_listen_fd = -1;
 static volatile int running = 1;
 static int manager_uid = -1;
+static int g_timeout_sec = REQ_TIMEOUT_SEC_DEFAULT;
 
 /* Configurable paths (parsed from argv, defaults from defines) */
 static const char *g_deny_path = DENY_LIST;
@@ -322,6 +323,11 @@ static int grant_app_root(int target_uid, const char *pkg_name) {
     fprintf(stderr, "[ksu-toast] grant_root: profile version=%d uid=%d allow=%d use_def=%d key=%.20s\n",
             profile.version, profile.curr_uid, profile.allow_su,
             profile.rp_config.use_default, profile.key);
+    /* Hex dump first 80 bytes for struct comparison */
+    fprintf(stderr, "[ksu-toast] grant_root: hex=");
+    unsigned char *pb = (unsigned char *)&profile;
+    for (int i = 0; i < 80; i++) fprintf(stderr, "%02x", pb[i]);
+    fprintf(stderr, "\n");
     close(ksu_fd);
 
     _exit(ioctl_ret == 0 ? 0 : 3);
@@ -339,8 +345,8 @@ static int ask_apk(int uid, const char *app_name) {
     struct sockaddr_un client_addr;
     socklen_t client_len = sizeof(client_addr);
 
-    /* Wait up to REQ_TIMEOUT_SEC for APK to connect */
-    struct timeval accept_tv = { .tv_sec = REQ_TIMEOUT_SEC, .tv_usec = 0 };
+    /* Wait up to REQ_TIMEOUT_SEC_DEFAULT for APK to connect */
+    struct timeval accept_tv = { .tv_sec = g_timeout_sec, .tv_usec = 0 };
     fd_set accept_fds;
     FD_ZERO(&accept_fds);
     FD_SET(apk_listen_fd, &accept_fds);
@@ -363,7 +369,7 @@ static int ask_apk(int uid, const char *app_name) {
     write(apk_fd, req, n);
 
     /* Wait for response with timeout */
-    struct timeval tv = { .tv_sec = REQ_TIMEOUT_SEC, .tv_usec = 0 };
+    struct timeval tv = { .tv_sec = g_timeout_sec, .tv_usec = 0 };
     fd_set rfds;
     FD_ZERO(&rfds);
     FD_SET(apk_fd, &rfds);
@@ -494,6 +500,20 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "[ksu-toast] Manager UID: %d\n", manager_uid);
     }
 
+    /* Read config file — /data/adb/ksu-toast/config/timeout overrides default */
+    FILE *timeout_file = fopen("/data/adb/ksu-toast/config/timeout", "re");
+    if (timeout_file) {
+        char buf[16] = {0};
+        if (fgets(buf, sizeof(buf), timeout_file)) {
+            int val = atoi(buf);
+            if (val >= 5 && val <= 60) {
+                g_timeout_sec = val;
+                fprintf(stderr, "[ksu-toast] Read timeout from config: %ds\n", g_timeout_sec);
+            }
+        }
+        fclose(timeout_file);
+    }
+
     /* Ensure /data/adb/ksu-toast/ exists */
     mkdir("/data/adb/ksu-toast", 0755);
 
@@ -546,13 +566,7 @@ int main(int argc, char *argv[]) {
         pthread_attr_init(&attr);
         pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 
-        int *fdp = malloc(sizeof(int));
-        if (fdp) {
-            *fdp = client_fd;
-            pthread_create(&thread, &attr, client_handler, (void *)(intptr_t)client_fd);
-        } else {
-            close(client_fd);
-        }
+        pthread_create(&thread, &attr, client_handler, (void *)(intptr_t)client_fd);
         pthread_attr_destroy(&attr);
     }
 

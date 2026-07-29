@@ -189,12 +189,11 @@ int main(int argc, char *argv[]) {
     return 1;
 
 exec_ksud:
-    /* Execute the real KernelSU su */
+    /* Execute the real KernelSU su daemon */
     execv(REAL_KSUD, argv);
 
-    /* If exec fails, fall back to shell */
+    /* If exec fails, print error and exit — don't fall back to sh
+     * (that would run as app's UID, not root, misleading the user) */
     fprintf(stderr, "su: failed to execute %s: %s\n", REAL_KSUD, strerror(errno));
-    execl("/system/bin/sh", "sh", NULL);
-
     return 1;
 }
