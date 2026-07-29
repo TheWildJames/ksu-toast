@@ -278,11 +278,19 @@ static int grant_app_root(int target_uid, const char *pkg_name) {
         int status;
         waitpid(pid, &status, 0);
         close(ksu_fd);
+        if (WIFEXITED(status)) {
+            int code = WEXITSTATUS(code);
+            fprintf(stderr, "[ksu-toast] grant_root: child exited with code %d\n", code);
+        } else if (WIFSIGNALED(status)) {
+            fprintf(stderr, "[ksu-toast] grant_root: child killed by signal %d\n", WTERMSIG(status));
+        }
         return WIFEXITED(status) && WEXITSTATUS(status) == 0 ? 0 : -1;
     }
 
     /* Child: setuid to manager UID */
+    fprintf(stderr, "[ksu-toast] grant_root: child setuid(%d)\n", manager_uid);
     if (setuid(manager_uid) < 0) {
+        fprintf(stderr, "[ksu-toast] grant_root: setuid failed: %d\n", errno);
         _exit(1);
     }
 
@@ -307,10 +315,12 @@ static int grant_app_root(int target_uid, const char *pkg_name) {
     memcpy(&cmd.profile, &profile, sizeof(profile));
 
     /* Call the ioctl */
-    ret = ioctl(ksu_fd, KSU_IOCTL_SET_APP_PROFILE, &cmd);
+    int ioctl_ret = ioctl(ksu_fd, KSU_IOCTL_SET_APP_PROFILE, &cmd);
+    int ioctl_err = errno;
+    fprintf(stderr, "[ksu-toast] grant_root: ioctl SET_APP_PROFILE returned %d, errno=%d)\n", ioctl_ret, ioctl_err);
     close(ksu_fd);
 
-    _exit(ret == 0 ? 0 : 3);
+    _exit(ioctl_ret == 0 ? 0 : 3);
 }
 
 /* ── Notify APK about a root request ──────────────────────

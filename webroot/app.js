@@ -152,17 +152,23 @@ $('save-timeout').addEventListener('click', async () => {
 
 $('restart-daemon').addEventListener('click', async () => {
     const pR = await sh(`cat "${PIDF}" 2>/dev/null`);
-    if (pR.out) await sh(`kill "${pR.out}" 2>/dev/null; sleep 1`);
+    if (pR.out) await sh(`kill -9 "${pR.out}" 2>/dev/null; sleep 1`);
     await sh(`rm -f "${SOCK}" "${PIDF}"`);
+    // Wait a moment, then check if it started
     await sh(`/system/bin/ksu-toastd \\
         --socket "${SOCK}" --apk-socket "@ksu-toast-apk" \\
         --deny-list "${DENY}" --cache "${CACHE}" \\
-        --config "${DIR}/config" > "${LOG}" 2>&1 &`);
-    setTimeout(() => sh(`cat "${PIDF}" 2>/dev/null`), 1000).then(r => {
-        if (r && r.out) toast('Daemon restarted (pid ' + r.out + ')');
-        else toast('Daemon may not have started');
-        refreshDashboard();
-    });
+        --config "${DIR}/config" > "${LOG}" 2>&1 &
+    `);
+    // Give daemon time to start and write PID
+    await new Promise(r => setTimeout(r, 2000));
+    const pidR2 = await sh(`cat "${PIDF}" 2>/dev/null`);
+    if (pidR2.out) {
+        toast('Daemon restarted (pid ' + pidR2.out + ')');
+    } else {
+        toast('Daemon failed to start');
+    }
+    refreshDashboard();
 });
 
 // ── Init ─────────────────────────────────────────────────
