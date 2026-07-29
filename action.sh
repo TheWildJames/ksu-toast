@@ -69,12 +69,42 @@ if [ -S "$SOCKET" ]; then
     # real unknown app requested root. No actual root is granted.
     echo "Sending test request to daemon (UID 99999, app TestApp)..."
     echo ""
-    TEST_RESULT=$(echo "CHECK 99999 TestApp" | $BUSYBOX nc -U -w 3 "$SOCKET" 2>&1 </dev/null) || true
+
+    # Try multiple methods to talk to the Unix socket
+    REQ="CHECK 99999 TestApp"
+    TEST_RESULT=""
+
+    # Method 1: busybox nc -U (Unix socket mode)
+    if [ -z "$TEST_RESULT" ]; then
+        TEST_RESULT=$(echo "$REQ" | $BUSYBOX nc -U -w 3 "$SOCKET" 2>/dev/null </dev/null) || true
+    fi
+
+    # Method 2: socat
+    if [ -z "$TEST_RESULT" ] && command -v socat >/dev/null 2>&1; then
+        TEST_RESULT=$(echo "$REQ" | socat UNIX-CONNECT:"$SOCKET" - 2>/dev/null) || true
+    fi
+
+    # Method 3: python3
+    if [ -z "$TEST_RESULT" ] && command -v python3 >/dev/null 2>&1; then
+        TEST_RESULT=$(python3 -c "
+import socket
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.settimeout(5)
+s.connect('$SOCKET')
+s.send(b'$REQ\n')
+r = s.recv(256)
+s.close()
+print(r.decode().strip())
+" 2>/dev/null) || true
+    fi
     if echo "$TEST_RESULT" | grep -q "ALLOWED"; then
         echo "✓ Daemon responded: ROOT GRANTED (would be allowed)"
     elif echo "$TEST_RESULT" | grep -q "DENIED"; then
         echo "⚠ Daemon responded: DENIED (check APK notification)"
         echo "  (A notification should appear within 10 seconds)"
+    elif [ -z "$TEST_RESULT" ]; then
+        echo "⚠ Could not send test — no Unix socket tool found"
+        echo "  Install socat or python3, or use a newer BusyBox"
     else
         echo "⚠ Daemon response: $TEST_RESULT"
         echo "  (Notification may already be showing)"
