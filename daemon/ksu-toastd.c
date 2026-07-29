@@ -468,6 +468,10 @@ int main(int argc, char *argv[]) {
     /* Create APK communication socket */
     apk_listen_fd = create_socket(apk_path);
     if (apk_listen_fd < 0) {
+        /* Fallback: try filesystem socket if abstract fails */
+        apk_listen_fd = create_socket("/data/adb/ksu-toast/apk.sock");
+    }
+    if (apk_listen_fd < 0) {
         fprintf(stderr, "[ksu-toast] WARNING: Failed to create APK socket: %s\n", apk_path);
         fprintf(stderr, "[ksu-toast] Companion APK notifications will not work.\n");
         /* Non-fatal — daemon can still serve cached/denied responses */

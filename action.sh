@@ -131,6 +131,14 @@ else
     }
 fi
 
+# Show APK connection status (written by companion app to debug socket connection)
+APK_STATUS_FILE="/data/local/tmp/ksu-toast-apk-status.txt"
+if [ -f "$APK_STATUS_FILE" ]; then
+    echo ""
+    echo "═══ APK connection log (last 3 lines) ═══"
+    tail -3 "$APK_STATUS_FILE" 2>/dev/null
+fi
+
 echo ""
 echo "═══ Help ═══"
 echo ""

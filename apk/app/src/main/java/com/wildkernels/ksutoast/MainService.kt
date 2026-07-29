@@ -83,12 +83,23 @@ class MainService : Service() {
         // Abstract socket — matches daemon's @ksu-toast-apk
         // No SELinux file context issues (no filesystem file created)
         val socketName = "ksu-toast-apk"
+        val fileSocketPath = "/data/adb/ksu-toast/apk.sock"
+        var attemptCount = 0
 
         // Retry loop — daemon might not be ready yet at boot
         while (running) {
             try {
+                attemptCount++
                 val socket = LocalSocket()
-                socket.connect(LocalSocketAddress(socketName, LocalSocketAddress.Namespace.ABSTRACT))
+
+                // Try abstract socket first (no SELinux), fall back to filesystem
+                try {
+                    socket.connect(LocalSocketAddress(socketName, LocalSocketAddress.Namespace.ABSTRACT))
+                    writeStatus("connected_abstract_$attemptCount")
+                } catch (_: Exception) {
+                    socket.connect(LocalSocketAddress(fileSocketPath, LocalSocketAddress.Namespace.FILESYSTEM))
+                    writeStatus("connected_filesystem_$attemptCount")
+                }
 
                 val reader = BufferedReader(InputStreamReader(socket.inputStream))
                 val writer = PrintWriter(socket.outputStream, true)
@@ -101,10 +112,19 @@ class MainService : Service() {
                 socket.close()
             } catch (e: Exception) {
                 if (!running) break
+                val msg = e.message ?: e.javaClass.simpleName
+                writeStatus("retry_${attemptCount}_${msg.take(40)}")
                 // Daemon socket not ready yet — retry in 3 seconds
                 try { Thread.sleep(3000) } catch (_: InterruptedException) { break }
             }
         }
+    }
+
+    /** Write a status line to debug file */
+    private fun writeStatus(msg: String) {
+        try {
+            java.io.File("/data/local/tmp/ksu-toast-apk-status.txt").appendText("$msg\n")
+        } catch (_: Exception) {}
     }
 
     /**
