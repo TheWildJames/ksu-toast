@@ -59,6 +59,7 @@
 /* Compute ioctl numbers matching KSU's uapi/supercall.h */
 #define KSU_IOCTL_SET_APP_PROFILE   _IOC(_IOC_WRITE, 'K', 12, 0)
 #define KSU_IOCTL_GET_MANAGER_UID   _IOC(_IOC_READ,  'K', 10, 0)
+#define CHANGE_MANAGER_UID          10006
 
 struct ksu_get_manager_uid_cmd {
     __u32 uid;
@@ -250,18 +251,19 @@ static int read_line(int fd, char *buf, size_t maxlen) {
 
 /* ── Grant root to an app via KSU ioctl ───────────────────
  *
- * We need to run as the manager app's UID because KSU's 
- * SET_APP_PROFILE ioctl checks only_manager(). 
- * Open the ksu fd as root (parent), then fork. The child
- * inherits the fd, setuid to manager UID, and calls the ioctl.
- * The kernel checks current_uid() on ioctl, not fd owner. */
+ * Uses the CHANGE_MANAGER_UID technique from ksu_toolkit:
+ * temporarily set the kernel's manager appid to root (UID 0),
+ * call SET_APP_PROFILE as root (passes only_manager()), then
+ * restore the original manager appid.
+ *
+ * Avoids fork/setuid/struct-inheritance issues entirely. */
 static int grant_app_root(int target_uid, const char *pkg_name) {
     if (manager_uid < 0) {
-        fprintf(stderr, "[ksu-toast] manager UID not resolved\n");
+        fprintf(stderr, "[ksu-toast] grant_root: manager UID not resolved\n");
         return -1;
     }
 
-    /* Open ksu fd as root (parent) — child inherits this fd */
+    /* Open ksu driver fd */
     int ksu_fd = -1;
     long ret = syscall(SYS_reboot, KSU_INSTALL_MAGIC1, KSU_INSTALL_MAGIC2, 0, &ksu_fd);
     if (ret != 0 || ksu_fd < 0) {
@@ -269,45 +271,19 @@ static int grant_app_root(int target_uid, const char *pkg_name) {
         return -1;
     }
 
-    pid_t pid = fork();
-    if (pid < 0) {
-        close(ksu_fd);
-        return -1;
-    }
-    if (pid > 0) {
-        /* Parent: wait for child, then close fd */
-        int status;
-        waitpid(pid, &status, 0);
-        close(ksu_fd);
-        if (WIFEXITED(status)) {
-            int code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
-            fprintf(stderr, "[ksu-toast] grant_root: child exited with code %d\n", code);
-        } else if (WIFSIGNALED(status)) {
-            fprintf(stderr, "[ksu-toast] grant_root: child killed by signal %d\n", WTERMSIG(status));
-        }
-        return WIFEXITED(status) && WEXITSTATUS(status) == 0 ? 0 : -1;
-    }
+    /* Step 1: Change manager appid to root so our ioctl passes only_manager() */
+    int orig_mgr = manager_uid;
+    fprintf(stderr, "[ksu-toast] grant_root: setting manager UID to 0 (was %d)\n", orig_mgr);
+    syscall(SYS_reboot, KSU_INSTALL_MAGIC1, CHANGE_MANAGER_UID, 0, 0, 0, 0);
 
-    /* Child: setuid to manager UID */
-    fprintf(stderr, "[ksu-toast] grant_root: child setuid(%d)\n", manager_uid);
-    if (setuid(manager_uid) < 0) {
-        fprintf(stderr, "[ksu-toast] grant_root: setuid failed: %d\n", errno);
-        _exit(1);
-    }
-
-    /* Use the inherited ksu fd — kernel checks current_uid() on ioctl */
-
-    /* Prepare the app_profile struct */
+    /* Step 2: Prepare and call SET_APP_PROFILE (now running as root = manager) */
     struct app_profile profile = {0};
     profile.version = KSU_APP_PROFILE_VER;
     profile.curr_uid = target_uid;
     profile.allow_su = 1;
     profile.rp_config.use_default = 1;
-    /* profile_valid() checks selinux_domain even when use_default=1.
-     * Must set a non-empty domain to avoid EINVAL. */
     strcpy(profile.rp_config.profile.selinux_domain, "u:r:ksu:s0");
 
-    /* Copy package name into key */
     if (pkg_name) {
         strncpy(profile.key, pkg_name, sizeof(profile.key) - 1);
     } else {
@@ -318,22 +294,17 @@ static int grant_app_root(int target_uid, const char *pkg_name) {
     memset(&cmd, 0, sizeof(cmd));
     memcpy(&cmd.profile, &profile, sizeof(profile));
 
-    /* Call the ioctl */
     int ioctl_ret = ioctl(ksu_fd, KSU_IOCTL_SET_APP_PROFILE, &cmd);
     int ioctl_err = errno;
-    fprintf(stderr, "[ksu-toast] grant_root: ioctl SET_APP_PROFILE returned %d, errno=%d\n", ioctl_ret, ioctl_err);
-    /* Dump profile for debugging EINVAL (profile_valid rejection) */
-    fprintf(stderr, "[ksu-toast] grant_root: profile version=%d uid=%d allow=%d use_def=%d key=%.20s\n",
-            profile.version, profile.curr_uid, profile.allow_su,
-            profile.rp_config.use_default, profile.key);
-    /* Hex dump first 280 bytes for struct comparison */
-    fprintf(stderr, "[ksu-toast] grant_root: hex=");
-    unsigned char *pb = (unsigned char *)&profile;
-    for (int i = 0; i < 280; i++) fprintf(stderr, "%02x", pb[i]);
-    fprintf(stderr, "\n");
-    close(ksu_fd);
+    fprintf(stderr, "[ksu-toast] grant_root: ioctl returned %d, errno=%d\n",
+            ioctl_ret, ioctl_err);
 
-    _exit(ioctl_ret == 0 ? 0 : 3);
+    /* Step 3: Restore original manager appid */
+    syscall(SYS_reboot, KSU_INSTALL_MAGIC1, CHANGE_MANAGER_UID, orig_mgr, 0, 0, 0);
+    fprintf(stderr, "[ksu-toast] grant_root: restored manager UID to %d\n", orig_mgr);
+
+    close(ksu_fd);
+    return (ioctl_ret == 0) ? 0 : -1;
 }
 
 /* ── Notify APK about a root request ──────────────────────
