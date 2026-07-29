@@ -31,7 +31,23 @@ fi
 file /system/bin/su 2>/dev/null | grep -q ELF && echo "SU WRAPPER: active (binary)" || echo "SU WRAPPER: symlink only"
 pm path com.wildkernels.ksutoast >/dev/null 2>&1 && echo "APK: installed" || echo "APK: not installed"
 
-# ── 2. Test ───────────────────────────────────────────────
+# ── 2. Restart daemon with latest binary ────────────────
+echo ""
+echo "═══ Restart daemon ═══"
+OLD_PID=$(cat "$PERSISTENT_DIR/daemon.pid" 2>/dev/null || echo 0)
+if kill -0 "$OLD_PID" 2>/dev/null; then
+    kill "$OLD_PID" 2>/dev/null
+    sleep 1
+    echo "Killed old daemon (pid $OLD_PID)"
+fi
+# Start new daemon
+"$MODDIR/system/bin/ksu-toastd" &
+NEW_PID=$!
+echo "$NEW_PID" > "$PERSISTENT_DIR/daemon.pid"
+sleep 2
+kill -0 "$NEW_PID" 2>/dev/null && echo "Daemon restarted (pid $NEW_PID)" || echo "Daemon failed to start"
+
+# ── 3. Test ───────────────────────────────────────────────
 echo ""
 echo "═══ Test: simulate root request ═══"
 

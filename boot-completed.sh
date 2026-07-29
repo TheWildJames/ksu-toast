@@ -54,9 +54,8 @@ if [ -x "$DAEMON" ]; then
     echo $! > "$DAEMON_PID"
     sleep 1
 
-    # Fix SELinux context on APK socket so the companion app can connect
-    chcon u:object_r:app_data_file:s0 "$APK_SOCKET" 2>/dev/null || true
-
+    # Socket inherits SELinux context from /data/adb/ksu-toast/
+    # Do NOT chcon — that breaks the APK connection
     if [ -S "$SOCKET" ]; then
         echo "[ksu-toast] Daemon started (pid: $(cat $DAEMON_PID))"
     else
