@@ -7,7 +7,7 @@ MODDIR=${0%/*}
 PERSISTENT_DIR=/data/adb/ksu-toast
 SOCKET="$PERSISTENT_DIR/daemon.sock"
 DAEMON="$PERSISTENT_DIR/daemon.log"
-APK_STATUS="/data/local/tmp/ksu-toast-apk-status.txt"
+APK_STATUS="/data/data/com.wildkernels.ksutoast/files/ksu-toast-apk-status.txt"
 
 echo "╔══════════════════════════════════╗"
 echo "║        KSU Toast                 ║"

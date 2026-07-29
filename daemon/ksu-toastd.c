@@ -191,15 +191,19 @@ static int create_socket(const char *path) {
     struct sockaddr_un addr = { .sun_family = AF_UNIX };
 
     /* Abstract socket if path starts with '@' (no filesystem file, no SELinux) */
+    socklen_t addr_len = sizeof(addr);
     if (path[0] == '@') {
         addr.sun_path[0] = '\0';
-        strncpy(addr.sun_path + 1, path + 1, sizeof(addr.sun_path) - 2);
+        size_t name_len = strlen(path + 1);
+        memcpy(addr.sun_path + 1, path + 1, name_len);
+        /* MUST pass exact length — kernel compares full abstract name up to addr_len */
+        addr_len = offsetof(struct sockaddr_un, sun_path) + 1 + name_len;
     } else {
         unlink(path);
         strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
     }
 
-    if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+    if (bind(fd, (struct sockaddr *)&addr, addr_len) < 0) {
         close(fd);
         return -1;
     }

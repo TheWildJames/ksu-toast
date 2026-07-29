@@ -147,7 +147,8 @@ class MainService : Service() {
     /** Write a status line to debug file */
     private fun writeStatus(msg: String) {
         try {
-            java.io.File("/data/local/tmp/ksu-toast-apk-status.txt").appendText("$msg\n")
+            val dir = filesDir
+            java.io.File(dir, "ksu-toast-apk-status.txt").appendText("$msg\n")
         } catch (_: Exception) {}
     }
 
