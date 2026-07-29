@@ -26,7 +26,7 @@
 #include <signal.h>
 
 #define DAEMON_SOCKET "/data/adb/ksu-toast/daemon.sock"
-#define REAL_KSUD     "/data/adb/ksu/bin/ksud"
+#define REAL_KSUD     "/data/adb/ksud"
 #define TIMEOUT_SEC   10
 #define BUF_SIZE      4096
 
